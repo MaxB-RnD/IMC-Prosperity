@@ -45,7 +45,7 @@ Product = str
 Position = int
 
 class TradingState(object):
-   def __init__(self,
+    def __init__(self,
                  traderData: str,
                  timestamp: Time,
                  listings: Dict[Symbol, Listing],
@@ -67,7 +67,7 @@ class TradingState(object):
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True)
    
 
-   class Trade:
+class Trade:
     def __init__(self, symbol: Symbol, price: int, quantity: int, buyer: UserId = None, seller: UserId = None, timestamp: int = 0) -> None:
         self.symbol = symbol
         self.price: int = price
