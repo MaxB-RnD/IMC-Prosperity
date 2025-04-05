@@ -1,0 +1,35 @@
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore environment-related files (if you use virtual environments)
+venv/
+.env/
+
+# Ignore IDE or editor specific files (add your specific editor here)
+.vscode/
+.idea/
+
+# Ignore Python distribution files
+dist/
+build/
+*.egg-info/
+
+# Ignore logs and temporary files
+*.log
+*.bak
+*.swp
+
+# Ignore coverage and testing files
+.coverage
+nosetests.xml
+coverage.xml
+*.cover
+*.hypothesis/
+
+# Ignore Python-related cache files
+*.pyc
+*.pyo
+*.pyd
