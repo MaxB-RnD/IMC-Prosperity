@@ -7,7 +7,7 @@ We're a team of financial pirates, algorithmic explorers, and machine learning b
 
 ---
 
-<br/><br/>
+<br/>
 ## 🧠 Who We Are
 
 - **Team Name:** Santoshi Shores  
