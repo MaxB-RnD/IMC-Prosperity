@@ -186,6 +186,6 @@ class Trader:
         result["KELP"] = Trade.kelp(self.state_KELP)
 
         # Return Orders, Conversions (0 = no request), and a Log String
-        traderData = "SAMPLE" # String value holding Trader state data required. It will be delivered as TradingState.traderData on next execution.
-        conversions = 1
+        traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
+        conversions = 1        # Indicates that a conversion was made (1 = conversion request, 0 = no request)
         return result, conversions, traderData
