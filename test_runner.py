@@ -1,6 +1,6 @@
 # Import the necessary classes from your datamodel and trading agent code
 from datamodel import *
-from santoshi_shores_max import *
+from round_0 import *
 
 # Set up some mock data to create a TradingState
 def create_mock_trading_state():

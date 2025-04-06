@@ -298,6 +298,87 @@ class Status:
             new_amt (int): The new amount for the bid order.
         """
         self._update_bids(prc, new_amt)
+    
+
+    def possible_buy_amt(self) -> int:
+        """Return possible buy amount. This function calculates 
+        the possible amount of product that can be bought based 
+        on the position limit and the current position.
+
+        Returns:
+            int: The possible buy amount, ensuring that the result does not exceed the 
+            available position limit or the current position limit.
+        """
+        # Calculate the Available Buy Amount Considering the Real-time Position
+        possible_buy_amount1 = self._position_limit[self.product] - self.rt_position()
+
+        # Calculate the Available Buy Amount Considering the Historical Position
+        possible_buy_amount2 = self._position_limit[self.product] - self.position()
+
+        # Return the Smaller of the Two Possible Buy Amounts to Ensure No Position Limit is Exceeded
+        return min(possible_buy_amount1, possible_buy_amount2)
+            
+
+    def possible_sell_amt(self) -> int:
+        """Return possible sell amount. This function calculates 
+        the possible amount of product that can be sold based 
+        on the position limit and the current position.
+
+        Returns:
+            int: The possible sell amount, ensuring that the result does not exceed the 
+                available position limit or the current position limit.
+        """
+        # Calculate the Available Sell Amount Considering the Real-time Position
+        possible_sell_amount1 = self._position_limit[self.product] + self.rt_position()
+
+        # Calculate the Available Sell Amount Considering the Historical Position
+        possible_sell_amount2 = self._position_limit[self.product] + self.position()
+
+        # Return the Smaller of the Two Possible Sell Amounts to Ensure no Position Limit is Exceeded
+        return min(possible_sell_amount1, possible_sell_amount2)
+    
+
+    def best_bid(self) -> int:
+        """Return best bid price and amount.
+
+        This function returns the best (highest) bid price from the buy orders. 
+        If there are no buy orders, it returns the best ask price minus 1, indicating that
+        there is no current bid available.
+
+        Returns:
+            tuple[int, int]: A tuple containing the best bid price and amount.
+        """
+        # Fetch the Buy Orders from the Order Book for the Current Product
+        buy_orders = self._state.order_depths[self.product].buy_orders
+
+        # If there are Buy Orders, Return the Highest Bid Price (max of the keys)
+        if len(buy_orders) > 0:
+            return max(buy_orders.keys())
+        
+        # If No Buy Orders Exist, Return the Best Ask Price Minus 1
+        else:
+            return self.best_ask - 1
+
+
+    def best_ask(self) -> int:
+        """Return best ask price and amount.
+
+        This function returns the best (lowest) ask price from the ask orders. 
+        If there are no ask orders, it returns the best bid price plus 1, indicating that
+        there is no current ask available.
+
+        Returns:
+            int: The best ask price.
+        """
+        # Fetch the Sell Orders from the Order Book for the Current Product
+        sell_orders = self._state.order_depths[self.product].sell_orders
+
+        # If there are Sell Orders, Return the Lowest Ask Price (min of the keys)
+        if len(sell_orders) > 0:
+            return min(sell_orders.keys())
+        else:
+            # If No Sell Orders Exist, Return the Best Bid Price Plus 1
+            return self.best_bid + 1
 
 
 
