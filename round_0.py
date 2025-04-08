@@ -23,7 +23,8 @@ class Status:
     # Position imits for Different Products
     _position_limit = {
         "RAINFOREST_RESIN": 50,
-        "KELP": 50,             
+        "KELP": 50,     
+        "SQUID_INK": 50,        
     }
 
     # Real-time Position for each Product Initialised to 0
@@ -51,6 +52,28 @@ class Status:
         """
         # Assign the Product Name to Instance Variable
         self.product = product  
+        self.price_history = []  # A list to store the price history
+
+
+    def add_price(self, price: float):
+        """Add a new price to the history."""
+        self.price_history.append(price)
+        if len(self.price_history) > 100:  # Limit to the last 100 prices (or any other number)
+            self.price_history.pop(0)
+    
+
+    def calculate_price_volatility(self) -> float:
+        """Calculate price volatility as the standard deviation of the last N prices."""
+        if len(self.price_history) < 2:
+            return 0  # Not enough data to calculate volatility
+
+        # Convert the price history to a NumPy array for easier calculation
+        price_array = np.array(self.price_history)
+        
+        # Calculate the standard deviation (volatility) of the price array
+        volatility = np.std(price_array)
+        
+        return volatility
 
 
     def update(self, state: TradingState) -> None:
@@ -381,7 +404,6 @@ class Status:
             return self.best_bid + 1
 
 
-
 # STRATEGY CLASS IMPLEMENTING ARBITRAGE AND MARKET MAKING STRATEGIES FOR TRADING BASED ON FAIR PRICE COMPARISON
 class Strategy:
     def arb(state: Status, fair_price):
@@ -548,11 +570,66 @@ class Trade:
         return orders
 
 
-    # Kelp Method
+    # Kelp Strategy (Refined for Price Volatility)
     def kelp(state: Status) -> list[Order]:
-        # For Now, use the Same Strategy as Rainforest Resin
-        return Trade.rainforestresin(state)
+        orders = []
 
+        # Get Current Midprice
+        current_price = state.maxamt_midprc()
+
+        # Set a base fair price based on current market conditions
+        fair_price = current_price
+
+        # Dynamic Spread based on price volatility (conservative adjustment for volatility)
+        price_volatility = state.calculate_price_volatility()  # A function that calculates volatility over time
+
+        # Adjust spread based on volatility (wider spread for more volatile periods)
+        gamma = 0.5 * price_volatility  # Scaling spread according to volatility
+        order_amount = 10  # Conservative order size based on volatility
+        q = state.rt_position() / order_amount
+        Q = state.position_limit() / order_amount
+
+        # Adjust Kappa values for dynamic market-making
+        kappa_b = 1 / max((fair_price - state.best_bid()) - 1, 1)  # Adjusting buy side (bid)
+        kappa_a = 1 / max((state.best_ask() - fair_price) - 1, 1)  # Adjusting sell side (ask)
+        
+        # Calculate price adjustments using the adjusted gamma and kappa
+        vfucn = lambda q, Q: float('-inf') if (q == Q + 1 or q == -(Q + 1)) else math.log(math.sin(((q + Q + 1) * math.pi) / (2 * Q + 2)))
+        delta_b = 1 / gamma * math.log(1 + gamma / kappa_b) - 1 / kappa_b * (vfucn(q + 1, Q) - vfucn(q, Q))
+        delta_a = 1 / gamma * math.log(1 + gamma / kappa_a) + 1 / kappa_a * (vfucn(q, Q) - vfucn(q - 1, Q))
+
+        # Calculate Bid and Ask Prices with dynamic spread adjustments
+        p_b = round(fair_price - delta_b)
+        p_a = round(fair_price + delta_a)
+
+        # Ensure the buy and sell prices stay within reasonable boundaries
+        p_b = min(p_b, fair_price)  # Avoid exceeding fair price for buy orders
+        p_b = min(p_b, state.best_bid() + 1)  # Don't place buy orders above the best bid
+        p_b = max(p_b, state.maxamt_bidprc() + 1)  # Prevent too far removed buy orders
+
+        p_a = max(p_a, fair_price)  # Ensure ask price doesn't fall below fair price
+        p_a = max(p_a, state.best_ask() - 1)  # Don't place sell orders below the best ask
+        p_a = min(p_a, state.maxamt_askprc() - 1)  # Prevent too far removed sell orders
+
+        # Calculate order amounts based on available position
+        buy_amount = min(order_amount, state.possible_buy_amt())
+        sell_amount = min(order_amount, state.possible_sell_amt())
+
+        # Place buy orders if there's capacity to buy
+        if buy_amount > 0:
+            orders.append(Order(state.product, int(p_b), int(buy_amount)))
+
+        # Place sell orders if there's capacity to sell
+        if sell_amount > 0:
+            orders.append(Order(state.product, int(p_a), -int(sell_amount)))
+
+        return orders
+
+
+
+    # Squid Strategy (Moving Average)
+    def squid(state: Status) -> list[Order]:
+        return Trade.kelp(state)
 
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
@@ -560,7 +637,7 @@ class Trader:
     # Create One Status Object Per Product
     state_RAINFOREST_RESIN = Status('RAINFOREST_RESIN')
     state_KELP = Status('KELP')
-
+    state_SQUID = Status('SQUID_INK')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -569,10 +646,13 @@ class Trader:
 
         # Intalise Result Dictionary
         result = {} 
+        self.state_KELP.add_price((self.state_KELP.best_bid() + self.state_KELP.best_ask()) / 2)
+
 
         # Use the Defined Strategies for Each Product
         result["RAINFOREST_RESIN"] = Trade.rainforestresin(self.state_RAINFOREST_RESIN)
         result["KELP"] = Trade.kelp(self.state_KELP)
+        result["SQUID_INK"] = Trade.squid(self.state_SQUID)
 
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution

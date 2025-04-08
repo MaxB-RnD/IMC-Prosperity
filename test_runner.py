@@ -1,48 +1,102 @@
-# Import the necessary classes from your datamodel and trading agent code
-from datamodel import *
-from round_0 import *
+import csv
+from datamodel import OrderDepth, TradingState, Observation
+from round_0 import Trader
 
-# Set up some mock data to create a TradingState
-def create_mock_trading_state():
-    # Mock the order depths for the products
-    order_depths = {
-        "RAINFOREST_RESIN": OrderDepth(),
-        "KELP": OrderDepth()
-    }
+# Load historical market states
+def load_order_book_data(file_path):
+    with open(file_path, newline='') as f:
+        reader = csv.DictReader(f, delimiter=';')
+        data_by_timestamp = {}
+        for row in reader:
+            ts = int(row['timestamp'])
+            product = row['product']
+            if ts not in data_by_timestamp:
+                data_by_timestamp[ts] = {}
+            if product not in data_by_timestamp[ts]:
+                data_by_timestamp[ts][product] = OrderDepth()
 
-    # Add some mock buy and sell orders for RAINFOREST_RESIN and KELP
-    order_depths["RAINFOREST_RESIN"].buy_orders = {100: 10, 101: 5, 102: 8}
-    order_depths["RAINFOREST_RESIN"].sell_orders = {110: 15, 111: 7, 112: 4}
+            order_depth = data_by_timestamp[ts][product]
+            # Parse bid orders
+            for i in range(1, 4):
+                price = row.get(f'bid_price_{i}')
+                vol = row.get(f'bid_volume_{i}')
+                if price and vol:
+                    order_depth.buy_orders[int(price)] = int(vol)
+            # Parse ask orders
+            for i in range(1, 4):
+                price = row.get(f'ask_price_{i}')
+                vol = row.get(f'ask_volume_{i}')
+                if price and vol:
+                    order_depth.sell_orders[int(price)] = int(vol)
+        return data_by_timestamp
 
-    order_depths["KELP"].buy_orders = {200: 20, 201: 15, 202: 5}
-    order_depths["KELP"].sell_orders = {210: 10, 211: 12, 212: 5}
+# Load executed trades (historical prices)
+def load_trade_data(file_path):
+    with open(file_path, newline='') as f:
+        reader = csv.DictReader(f, delimiter=';')
+        trades_by_ts = {}
+        for row in reader:
+            ts = int(row['timestamp'])
+            symbol = row['symbol']
+            price = float(row['price'])
+            qty = int(row['quantity'])
 
-    # Mock the other necessary data (position, trades, etc.)
-    position = {"RAINFOREST_RESIN": 10, "KELP": 5}
-    own_trades = {}
-    market_trades = {}
-    observations = Observation({}, {})
+            if ts not in trades_by_ts:
+                trades_by_ts[ts] = []
+            trades_by_ts[ts].append((symbol, price, qty))
+        return trades_by_ts
 
-    # Create and return the TradingState object
-    return TradingState(
-        traderData="test_data",
-        timestamp=1234567890,
-        listings={},
-        order_depths=order_depths,
-        own_trades=own_trades,
-        market_trades=market_trades,
-        position=position,
-        observations=observations
-    )
+# Run the backtest with error handling
+def run_backtest(orderbook_data, trade_data):
+    trader = Trader()
+    position = {"RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0}
+    pnl = {"RAINFOREST_RESIN": 0.0, "KELP": 0.0, "SQUID_INK": 0.0}
 
-# Create a mock trading state
-state = create_mock_trading_state()
+    for ts in sorted(orderbook_data.keys()):
+        state = TradingState(
+            traderData="",
+            timestamp=ts,
+            listings={},
+            order_depths=orderbook_data[ts],
+            own_trades={},
+            market_trades={},
+            position=position,
+            observations=Observation({}, {})
+        )
 
-# Instantiate a Trader and run it with the mock state
-trader = Trader()
-result, conversions, trader_data = trader.run(state)
+        try:
+            orders, conversions, _ = trader.run(state)
+        except (OverflowError, ValueError, ZeroDivisionError, TypeError) as e:
+            print(f"[Warning] Skipping timestamp {ts} due to error: {e}")
+            continue
 
-# Print the results
-print("Result:", result)
-print("Conversions:", conversions)
-print("Trader Data:", trader_data)
+        # Simulate execution: assume orders are filled at the top of book
+        for product, order_list in orders.items():
+            for order in order_list:
+                volume = order.quantity
+                price = order.price
+                if price is None or price == float("inf") or price == float("-inf"):
+                    print(f"[Debug] Skipping invalid price order at ts {ts}: {price}")
+                    continue
+                if order.quantity > 0:
+                    # Buy
+                    pnl[product] -= price * volume
+                    position[product] += volume
+                else:
+                    # Sell
+                    pnl[product] += price * (-volume)
+                    position[product] += volume
+
+    return pnl, position
+
+# Load everything and run it
+orderbook_data = load_order_book_data("Performance Data/Historic Data/prices_round_1_day_-2.csv")
+trade_data = load_trade_data("Performance Data/Historic Data/trades_round_1_day_-2.csv")
+pnl, final_position = run_backtest(orderbook_data, trade_data)
+
+print("PnL Summary:")
+for product in pnl:
+    print(f"{product}: {pnl[product]:.2f} seashells")
+
+print("\nFinal Positions:")
+print(final_position)
