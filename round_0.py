@@ -564,7 +564,7 @@ class Trade:
 
         # Place Symmetric Orders with Fixed Quantity
         orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.2, order_amount=20)) # Sell Order
 
         # Return the Result
         return orders
@@ -572,64 +572,35 @@ class Trade:
 
     # Kelp Strategy (Refined for Price Volatility)
     def kelp(state: Status) -> list[Order]:
+        # Basic Strategy: place buy and sell orders near the midprice
         orders = []
-
+        
         # Get Current Midprice
         current_price = state.maxamt_midprc()
 
-        # Set a base fair price based on current market conditions
-        fair_price = current_price
+        # Place Symmetric Orders with Fixed Quantity
+        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.2, order_amount=20)) # Sell Order
 
-        # Dynamic Spread based on price volatility (conservative adjustment for volatility)
-        price_volatility = state.calculate_price_volatility()  # A function that calculates volatility over time
-
-        # Adjust spread based on volatility (wider spread for more volatile periods)
-        gamma = 0.5 * price_volatility  # Scaling spread according to volatility
-        order_amount = 10  # Conservative order size based on volatility
-        q = state.rt_position() / order_amount
-        Q = state.position_limit() / order_amount
-
-        # Adjust Kappa values for dynamic market-making
-        kappa_b = 1 / max((fair_price - state.best_bid()) - 1, 1)  # Adjusting buy side (bid)
-        kappa_a = 1 / max((state.best_ask() - fair_price) - 1, 1)  # Adjusting sell side (ask)
-        
-        # Calculate price adjustments using the adjusted gamma and kappa
-        vfucn = lambda q, Q: float('-inf') if (q == Q + 1 or q == -(Q + 1)) else math.log(math.sin(((q + Q + 1) * math.pi) / (2 * Q + 2)))
-        delta_b = 1 / gamma * math.log(1 + gamma / kappa_b) - 1 / kappa_b * (vfucn(q + 1, Q) - vfucn(q, Q))
-        delta_a = 1 / gamma * math.log(1 + gamma / kappa_a) + 1 / kappa_a * (vfucn(q, Q) - vfucn(q - 1, Q))
-
-        # Calculate Bid and Ask Prices with dynamic spread adjustments
-        p_b = round(fair_price - delta_b)
-        p_a = round(fair_price + delta_a)
-
-        # Ensure the buy and sell prices stay within reasonable boundaries
-        p_b = min(p_b, fair_price)  # Avoid exceeding fair price for buy orders
-        p_b = min(p_b, state.best_bid() + 1)  # Don't place buy orders above the best bid
-        p_b = max(p_b, state.maxamt_bidprc() + 1)  # Prevent too far removed buy orders
-
-        p_a = max(p_a, fair_price)  # Ensure ask price doesn't fall below fair price
-        p_a = max(p_a, state.best_ask() - 1)  # Don't place sell orders below the best ask
-        p_a = min(p_a, state.maxamt_askprc() - 1)  # Prevent too far removed sell orders
-
-        # Calculate order amounts based on available position
-        buy_amount = min(order_amount, state.possible_buy_amt())
-        sell_amount = min(order_amount, state.possible_sell_amt())
-
-        # Place buy orders if there's capacity to buy
-        if buy_amount > 0:
-            orders.append(Order(state.product, int(p_b), int(buy_amount)))
-
-        # Place sell orders if there's capacity to sell
-        if sell_amount > 0:
-            orders.append(Order(state.product, int(p_a), -int(sell_amount)))
-
+        # Return the Result
         return orders
-
 
 
     # Squid Strategy (Moving Average)
     def squid(state: Status) -> list[Order]:
-        return Trade.kelp(state)
+        # Basic Strategy: place buy and sell orders near the midprice
+        orders = []
+        
+        # Get Current Midprice
+        current_price = state.maxamt_midprc()
+
+        # Place Symmetric Orders with Fixed Quantity
+        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.15, order_amount=15)) # Sell Order
+
+        # Return the Result
+        return orders
+
 
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT

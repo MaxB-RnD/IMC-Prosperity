@@ -67,7 +67,7 @@ def run_backtest(orderbook_data, trade_data):
         try:
             orders, conversions, _ = trader.run(state)
         except (OverflowError, ValueError, ZeroDivisionError, TypeError) as e:
-            print(f"[Warning] Skipping timestamp {ts} due to error: {e}")
+            #print(f"[Warning] Skipping timestamp {ts} due to error: {e}")
             continue
 
         # Simulate execution: assume orders are filled at the top of book
@@ -90,8 +90,8 @@ def run_backtest(orderbook_data, trade_data):
     return pnl, position
 
 # Load everything and run it
-orderbook_data = load_order_book_data("Performance Data/Historic Data/prices_round_1_day_-2.csv")
-trade_data = load_trade_data("Performance Data/Historic Data/trades_round_1_day_-2.csv")
+orderbook_data = load_order_book_data("Performance Data/Historic Data/prices_round_1_day_0.csv")
+trade_data = load_trade_data("Performance Data/Historic Data/trades_round_1_day_0.csv")
 pnl, final_position = run_backtest(orderbook_data, trade_data)
 
 print("PnL Summary:")
