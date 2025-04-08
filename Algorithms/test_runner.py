@@ -64,11 +64,8 @@ def run_backtest(orderbook_data, trade_data):
             observations=Observation({}, {})
         )
 
-        try:
-            orders, conversions, _ = trader.run(state)
-        except (OverflowError, ValueError, ZeroDivisionError, TypeError) as e:
-            #print(f"[Warning] Skipping timestamp {ts} due to error: {e}")
-            continue
+        # Run the Algorithm
+        orders, conversions, _ = trader.run(state)
 
         # Simulate execution: assume orders are filled at the top of book
         for product, order_list in orders.items():

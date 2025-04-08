@@ -52,28 +52,6 @@ class Status:
         """
         # Assign the Product Name to Instance Variable
         self.product = product  
-        self.price_history = []  # A list to store the price history
-
-
-    def add_price(self, price: float):
-        """Add a new price to the history."""
-        self.price_history.append(price)
-        if len(self.price_history) > 100:  # Limit to the last 100 prices (or any other number)
-            self.price_history.pop(0)
-    
-
-    def calculate_price_volatility(self) -> float:
-        """Calculate price volatility as the standard deviation of the last N prices."""
-        if len(self.price_history) < 2:
-            return 0  # Not enough data to calculate volatility
-
-        # Convert the price history to a NumPy array for easier calculation
-        price_array = np.array(self.price_history)
-        
-        # Calculate the standard deviation (volatility) of the price array
-        volatility = np.std(price_array)
-        
-        return volatility
 
 
     def update(self, state: TradingState) -> None:
@@ -519,6 +497,13 @@ class Strategy:
         delta_b = 1 / gamma * math.log(1 + gamma / kappa_b) - 1 / kappa_b * (vfucn(q + 1, Q) - vfucn(q, Q))
         delta_a = 1 / gamma * math.log(1 + gamma / kappa_a) + 1 / kappa_a * (vfucn(q, Q) - vfucn(q - 1, Q))
 
+        # Cap delta_a to a maximum value to avoid infinity
+        max_delta = 1e6  # Set a maximum delta value that is reasonable
+        delta_b = min(delta_b, max_delta)
+        delta_b = max(delta_b, -max_delta)
+        delta_a = min(delta_a, max_delta)
+        delta_a = max(delta_a, -max_delta)
+
         # Calculate the Optimal Bid and Ask Prices Based on the Fair Price and Adjustments
         p_b = round(fair_price - delta_b)        
         p_a = round(fair_price + delta_a)
@@ -564,7 +549,7 @@ class Trade:
 
         # Place Symmetric Orders with Fixed Quantity
         orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=10)) # Sell Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
 
         # Return the Result
         return orders
@@ -580,7 +565,7 @@ class Trade:
 
         # Place Symmetric Orders with Fixed Quantity
         orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.15, order_amount=15)) # Sell Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
 
         # Return the Result
         return orders
@@ -596,7 +581,7 @@ class Trade:
 
         # Place Symmetric Orders with Fixed Quantity
         orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.15, order_amount=15)) # Sell Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
 
         # Return the Result
         return orders
@@ -617,8 +602,6 @@ class Trader:
 
         # Intalise Result Dictionary
         result = {} 
-        self.state_KELP.add_price((self.state_KELP.best_bid() + self.state_KELP.best_ask()) / 2)
-
 
         # Use the Defined Strategies for Each Product
         result["RAINFOREST_RESIN"] = Trade.rainforestresin(self.state_RAINFOREST_RESIN)
