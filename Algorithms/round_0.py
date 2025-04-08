@@ -564,7 +564,7 @@ class Trade:
 
         # Place Symmetric Orders with Fixed Quantity
         orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.2, order_amount=20)) # Sell Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=10)) # Sell Order
 
         # Return the Result
         return orders
@@ -580,7 +580,7 @@ class Trade:
 
         # Place Symmetric Orders with Fixed Quantity
         orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.2, order_amount=20)) # Sell Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.15, order_amount=15)) # Sell Order
 
         # Return the Result
         return orders
