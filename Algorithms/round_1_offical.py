@@ -51,7 +51,10 @@ class Status:
             product (str): The product to track (e.g., 'RAINFOREST_RESIN' or 'KELP')
         """
         # Assign the Product Name to Instance Variable
-        self.product = product  
+        self.product = product
+
+        # Initialise Historical Data for Midprices
+        self.history = []
 
 
     def update(self, state: TradingState) -> None:
@@ -145,6 +148,19 @@ class Status:
             np.ndarray: The order depth data as a NumPy array.
         """
         return np.array(Status._hist_order_depths[self.product][f'{type}{depth}'][-size:], dtype=np.float32)
+    
+
+    def hist_mid_prc(self, size:int) -> np.ndarray:
+        """Return historical mid price.
+
+        Args:
+            size (int): size of data
+
+        Returns:
+            np.ndarray: historical mid price
+        
+        """
+        return (self.hist_order_depth('bidprc', 1, size) + self.hist_order_depth('askprc', 1, size)) / 2
 
 
     def maxamt_bidprc(self) -> int:
@@ -573,17 +589,35 @@ class Trade:
 
     # Squid Strategy (Moving Average)
     def squid(state: Status) -> list[Order]:
-        # Basic Strategy: place buy and sell orders near the midprice
         orders = []
         
-        # Get Current Midprice
-        current_price = state.maxamt_midprc()
-
-        # Place Symmetric Orders with Fixed Quantity
-        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
-
-        # Return the Result
+        # Fetch the current midprice
+        current_mid = state.hist_mid_prc(size=1)[0]  # Get the latest midprice from the history
+        
+        # Update the historical list with the new midprice
+        state.history.append(current_mid)
+        if len(state.history) > 10:
+            state.history.pop(0)  # Keep the list size at 10
+        
+        # Calculate mean and std of the historical data
+        mean = np.mean(state.history)
+        std = np.std(state.history)
+        
+        # Calculate the Z-score
+        z = (current_mid - mean) / std if std > 0 else 0
+                
+        # Buy signal when price deviates too far below the mean (mean reversion)
+        if z < -1.2 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
+            buy_price = state.best_bid()  # Correct price to buy at
+            order_amount = min(20, state.possible_buy_amt())  # Don't exceed available amount
+            orders.append(Order("SQUID_INK", buy_price, order_amount))  # Positive = buy
+        
+        # Sell signal when price deviates too far above the mean (mean reversion)
+        if z > 1.2 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
+            sell_price = state.best_ask()  # Correct price to sell at
+            order_amount = min(20, state.possible_sell_amt())  # Don't exceed available amount
+            orders.append(Order("SQUID_INK", sell_price, -order_amount))  # Negative = sell
+        
         return orders
 
 

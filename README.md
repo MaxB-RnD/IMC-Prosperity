@@ -31,6 +31,13 @@ This round introduces a third tradable product: `Squid Ink`.
 
 All submissions are still processed instantly — perfect for iterating and experimenting with evolving strategies.
 
+
+### Hint
+
+Squid Ink can be a very volatile product with price having large swings. Making a two-sided market or carrying position can be risky for such an instrument. However, with large swings comes large reversion. Squid Ink prices show more tendency to revert short term swings in price.
+
+A metric to keep track of the size of deviation/swing from recent average could help in trading profitable positions.
+
 ---
 
 ### 💱 Manual Challenge
