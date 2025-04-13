@@ -1,6 +1,6 @@
 import csv
 from datamodel import OrderDepth, TradingState, Observation
-from round_1_offical import Trader
+from Algorithms.round_2_offical import Trader
 
 # Load historical market states
 def load_order_book_data(file_path):
