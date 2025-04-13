@@ -1,11 +1,10 @@
-def basket_arb(basket: Status, components: list[tuple[Status, int]], theta, threshold):
+def basket_arb(basket: Status, components: list[tuple[Status, int]], alpha=0.2, threshold):
     basket_price = basket.mid()
     underlying_price = sum(qty * comp.mid() for comp, qty in components)
     spread = basket_price - underlying_price
     basket.spread_history.append(spread)
 
     # Use EMA for theta
-    alpha = 0.2
     if hasattr(basket, "ema_theta"):
         basket.ema_theta = alpha * spread + (1 - alpha) * basket.ema_theta
     else:
