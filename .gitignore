@@ -18,7 +18,6 @@ build/
 *.egg-info/
 
 # Ignore logs and temporary files
-*.log
 *.bak
 *.swp
 
