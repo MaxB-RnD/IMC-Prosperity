@@ -49,8 +49,18 @@ def load_trade_data(file_path):
 # Run the backtest with error handling
 def run_backtest(orderbook_data, trade_data):
     trader = Trader()
-    position = {"RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0}
-    pnl = {"RAINFOREST_RESIN": 0.0, "KELP": 0.0, "SQUID_INK": 0.0}
+    
+    # Update position and pnl to include new products
+    position = {
+        "RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0,
+        "CROISSANTS": 0, "JAMS": 0, "DJEMBES": 0,
+        "PICNIC_BASKET1": 0, "PICNIC_BASKET2": 0
+    }
+    pnl = {
+        "RAINFOREST_RESIN": 0.0, "KELP": 0.0, "SQUID_INK": 0.0,
+        "CROISSANTS": 0.0, "JAMS": 0.0, "DJEMBES": 0.0,
+        "PICNIC_BASKET1": 0.0, "PICNIC_BASKET2": 0.0
+    }
 
     for ts in sorted(orderbook_data.keys()):
         state = TradingState(
@@ -95,8 +105,8 @@ orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_ro
 trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-1.csv")
 pnl1, final_position1 = run_backtest(orderbook_data1, trade_data1)
 
-orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-2.csv")
-trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-2.csv")
+orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_1.csv")
+trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_1.csv")
 pnl2, final_position2 = run_backtest(orderbook_data2, trade_data2)
 
 # Add totals for PnL

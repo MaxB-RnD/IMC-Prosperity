@@ -1,4 +1,4 @@
-### A TUTORIAL ROUND TEST FILE
+### ROUND 2 GAME DAY FILE
 
 # Import Required Libraries
 import json
@@ -11,7 +11,6 @@ from datamodel import *
 
 # Used for Gaussian Distribution Modeling if Needed
 from statistics import NormalDist 
-
 
 
 # CLASS FOR TRACKING MARKET STATUS AND HISTORICAL DATA
@@ -29,7 +28,7 @@ class Status:
         "PICNIC_BASKET2": 100,
         "CROISSANTS": 250,
         "JAMS": 350,
-        "DJEMB": 60,
+        "DJEMBES": 60,
     }
 
     # Real-time Position for each Product Initialised to 0
@@ -401,6 +400,73 @@ class Status:
         else:
             # If No Sell Orders Exist, Return the Best Bid Price Plus 1
             return self.best_bid + 1
+    
+
+    def mid(self) -> float:
+        """
+        Calculates the midpoint between the best bid and best ask prices.
+
+        Returns:
+            float: The mid price of the product.
+        """
+        return (self.best_bid() + self.best_ask()) / 2
+
+
+    def worst_bid(self) -> int:
+        """
+        Returns the worst (lowest) bid price currently available in the buy order book.
+        If there are no buy orders, returns one less than the best ask price as a fallback.
+
+        Returns:
+            int: The worst bid price.
+        """
+        buy_orders = self._state.order_depths[self.product].buy_orders
+        if len(buy_orders) > 0:
+            return min(buy_orders.keys())
+        else:
+            return self.best_ask() - 1
+
+
+    def worst_ask(self) -> int:
+        """
+        Returns the worst (highest) ask price currently available in the sell order book.
+        If there are no sell orders, returns one more than the best bid price as a fallback.
+
+        Returns:
+            int: The worst ask price.
+        """
+        sell_orders = self._state.order_depths[self.product].sell_orders
+        if len(sell_orders) > 0:
+            return max(sell_orders.keys())
+        else:
+            return self.best_bid() + 1
+
+
+    def vwap(self) -> float:
+        """
+        Calculates the Volume Weighted Average Price (VWAP) of the product
+        based on current buy and sell orders.
+
+        Returns:
+            float: The VWAP of the product across both sides of the order book.
+        """
+        vwap = 0
+        total_amt = 0
+
+        # Accumulate Price * Volume for All Buy Orders
+        for prc, amt in self._state.order_depths[self.product].buy_orders.items():
+            vwap += (prc * amt)
+            total_amt += amt
+
+        # Accumulate Price * Volume for All Sell Orders (amounts are negative)
+        for prc, amt in self._state.order_depths[self.product].sell_orders.items():
+            vwap += (prc * abs(amt))
+            total_amt += abs(amt)
+
+        # Compute the Average Weighted by Total Volume
+        vwap /= total_amt
+        return vwap
+
 
 
 # STRATEGY CLASS IMPLEMENTING ARBITRAGE AND MARKET MAKING STRATEGIES FOR TRADING BASED ON FAIR PRICE COMPARISON
@@ -557,7 +623,68 @@ class Strategy:
         return orders
 
 
+    def basket_arb(basket: Status, components: list[tuple[Status, int]], theta, threshold):
+        """
+        Execute arbitrage based on the spread between a basket and its component products.
+        
+        Parameters:
+            basket (Status): Status object for the basket product.
+            components (list of (Status, int)): List of tuples with component product status and quantity in the basket.
+            theta (float): The average (or expected) spread between basket and component prices.
+            threshold (float): Minimum deviation from theta to trigger a trade.
 
+        Returns:
+            list[Order]: List of orders to exploit arbitrage opportunities.
+        """
+        # Mid Price of the Basket
+        basket_prc = basket.mid()
+
+        # Fair Price of the Basket Based on Component VWAPs
+        underlying_prc = sum(qty * comp.vwap() for comp, qty in components)
+
+        # Price Difference (spread)
+        spread = basket_prc - underlying_prc
+
+        # Normalise the Spread by Subtracting Mean Offset
+        norm_spread = spread - theta
+
+        # Intalise Orders List
+        orders = []
+
+        # If Basket is too Expensive, Sell Basket, Buy Somponents
+        if norm_spread > threshold:
+            # Sell Basket
+            orders.append(Order(basket.product, int(basket.worst_bid()), -int(basket.possible_sell_amt())))
+
+            # Buy Components
+            for comp, qty in components:
+                orders.append(Order(comp.product, int(comp.worst_ask()), int(comp.possible_buy_amt())))
+
+        # If Basket is too Cheap, Buy Basket, Sell Components
+        elif norm_spread < -threshold:
+            # Buy Basket
+            orders.append(Order(basket.product, int(basket.worst_ask()), int(basket.possible_buy_amt())))
+
+            # Sell Components
+            for comp, qty in components:
+                orders.append(Order(comp.product, int(comp.worst_bid()), -int(comp.possible_sell_amt())))
+
+        # Return the Order List
+        return orders
+
+        
+        basket_prc = basket.mid
+        underlying_prc = 4 * chocolate.vwap + 6 * strawberries.vwap + 1 * roses.vwap
+        spread = basket_prc - underlying_prc
+        norm_spread = spread - theta
+
+        orders = []
+        if norm_spread > threshold:
+            orders.append(Order(basket.product, int(basket.worst_bid), -int(basket.possible_sell_amt)))
+        elif norm_spread < -threshold:
+            orders.append(Order(basket.product, int(basket.worst_ask), int(basket.possible_buy_amt)))
+
+        return orders
 
 
 
@@ -615,32 +742,93 @@ class Trade:
         z = (current_mid - mean) / std if std > 0 else 0
                 
         # Buy signal when price deviates too far below the mean (mean reversion)
-        if z < -1.2 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
+        if z < -0.15 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
             buy_price = state.best_bid()  # Correct price to buy at
             order_amount = min(20, state.possible_buy_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", buy_price, order_amount))  # Positive = buy
         
         # Sell signal when price deviates too far above the mean (mean reversion)
-        if z > 1.2 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
+        if z > 0.15 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
             sell_price = state.best_ask()  # Correct price to sell at
             order_amount = min(20, state.possible_sell_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", sell_price, -order_amount))  # Negative = sell
         
         return orders
 
+
     # Picnic Basket #1 Trading Strategy
-    def picnic1(picnic1: Status, crossiants: Status, djemb: Status, jams: Status) -> list[Order]:
+    def picnic1(picnic1: Status, croissants: Status, djembes: Status, jams: Status) -> list[Order]:
+        # Intalise Orders
         orders = []
-        orders.extend(Strategy.index_arb(picnic1, crossiants, djemb, jams, threshold=30))
-        # orders.extend(Strategy.informed_trading(roses, basket))
+
+        # Make Components
+        components = [(croissants, 6), (jams, 3), (djembes, 1)]
+
+        # Place and Return Orders
+        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, theta=380, threshold=30))
         return orders
     
+
     # Picnic Basket #2 Trading Strategy
-    def picnic2(picnic2: Status, crossiants: Status, jams: Status) -> list[Order]:
+    def picnic2(picnic2: Status, croissants: Status, jams: Status) -> list[Order]:
+        # Intalise Orders
         orders = []
-        orders.extend(Strategy.index_arb(picnic2, crossiants, jams, threshold=30))
-        # orders.extend(Strategy.informed_trading(roses, basket))
+
+        # Make Components
+        components = [(croissants, 4), (jams, 2)]
+
+        # Place and Return Orders
+        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, theta=380, threshold=30))
         return orders
+    
+    
+    # Croissants Strategy (Refined for Price Volatility)
+    def croissants(state: Status) -> list[Order]:
+        # Basic Strategy: place buy and sell orders near the midprice
+        orders = []
+        
+        # Get Current Midprice
+        current_price = state.maxamt_midprc()
+
+        # Place Symmetric Orders with Fixed Quantity
+        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
+
+        # Return the Result
+        return orders
+
+
+    # Jams Strategy (Refined for Price Volatility)
+    def jams(state: Status) -> list[Order]:
+        # Basic Strategy: place buy and sell orders near the midprice
+        orders = []
+        
+        # Get Current Midprice
+        current_price = state.maxamt_midprc()
+
+        # Place Symmetric Orders with Fixed Quantity
+        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
+
+        # Return the Result
+        return orders
+    
+
+    # Djembes Strategy (Refined for Price Volatility)
+    def djembes(state: Status) -> list[Order]:
+        # Basic Strategy: place buy and sell orders near the midprice
+        orders = []
+        
+        # Get Current Midprice
+        current_price = state.maxamt_midprc()
+
+        # Place Symmetric Orders with Fixed Quantity
+        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
+        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
+
+        # Return the Result
+        return orders
+
 
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
@@ -653,7 +841,7 @@ class Trader:
     state_PICNIC2 = Status('PICNIC_BASKET2')
     state_CROISSANTS = Status('CROISSANTS')
     state_JAMS = Status('JAMS')
-    state_DJEMB = Status('DJEMB')
+    state_DJEMBES = Status('DJEMBES')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -664,10 +852,17 @@ class Trader:
         result = {} 
 
         # Use the Defined Strategies for Each Product
+        # Round 1
         result["RAINFOREST_RESIN"] = Trade.rainforestresin(self.state_RAINFOREST_RESIN)
         result["KELP"] = Trade.kelp(self.state_KELP)
-        result["PICNIC1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMB, self.state_JAMS)
-        result["PICNIC2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
+        result["SQUID_INK"] = Trade.squid(self.state_SQUID)
+
+        # Round 2
+        result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
+        result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
+        result["CROISSANTS"] = Trade.croissants(self.state_CROISSANTS)
+        result["JAMS"] = Trade.jams(self.state_JAMS)
+        result["DJEMBES"] = Trade.djembes(self.state_DJEMBES)
 
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution

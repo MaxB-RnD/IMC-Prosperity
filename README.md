@@ -1,4 +1,4 @@
-# 🌊 IMC Prosperity 3 — Round 2 Submission
+# 🌊 **IMC Prosperity 3 — Round 2 Submission**
 
 Ahoy again, trader! ⚓  
 Welcome to **Round 2** of the **IMC Prosperity 3 Trading Competition**.
@@ -7,7 +7,7 @@ With Round 1 under our belts, we’re no longer just testing the waters — we�
 
 ---
 
-## 🧭 Overview
+## 🧭 **Overview**
 
 Round 2 expands the archipelago’s offerings with **composite products**, new trading opportunities, and a tactical manual challenge.  
 We’re evolving with the market — adapting strategies, refining edge cases, and embracing complexity.
@@ -63,7 +63,7 @@ Choose wisely. A treasure split too many ways might leave you with crumbs.
 
 ---
 
-## 🌊 In Summary
+## 🌊 **In Summary**
 
 Round 2 is about **optimization under complexity** — both in trading and strategic decision-making.  
 It’s not just about speed or smarts anymore — it’s about depth, foresight, and finesse.
