@@ -1,8 +1,8 @@
 import csv
 from datamodel import OrderDepth, TradingState, Observation
-from Algorithms.round_2_offical import Trader
+from round_2_offical import Trader
 
-# Load historical market states
+# Load Historical Market States
 def load_order_book_data(file_path):
     with open(file_path, newline='') as f:
         reader = csv.DictReader(f, delimiter=';')
@@ -87,16 +87,16 @@ def run_backtest(orderbook_data, trade_data):
     return pnl, position
 
 # Load everything and run it
-orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_1_day_0.csv")
-trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_1_day_0.csv")
+orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_0.csv")
+trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_0.csv")
 pnl0, final_position0 = run_backtest(orderbook_data0, trade_data0)
 
-orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_1_day_-1.csv")
-trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_1_day_-1.csv")
+orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-1.csv")
+trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-1.csv")
 pnl1, final_position1 = run_backtest(orderbook_data1, trade_data1)
 
-orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_1_day_-2.csv")
-trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_1_day_-2.csv")
+orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-2.csv")
+trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-2.csv")
 pnl2, final_position2 = run_backtest(orderbook_data2, trade_data2)
 
 # Add totals for PnL
