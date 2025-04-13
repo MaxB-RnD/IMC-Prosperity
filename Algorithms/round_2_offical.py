@@ -4,6 +4,7 @@
 import json
 import numpy as np
 import math
+from collections import deque
 from typing import Any
 
 # Import the Platform's Provided Classes and Types
@@ -59,6 +60,9 @@ class Status:
 
         # Initialise Historical Data for Midprices
         self.history = []
+
+        # Keeps Last 100 Spreads
+        self.spread_history = deque(maxlen=100)
 
 
     def update(self, state: TradingState) -> None:
@@ -637,52 +641,34 @@ class Strategy:
             list[Order]: List of orders to exploit arbitrage opportunities.
         """
         # Mid Price of the Basket
-        basket_prc = basket.mid()
+        basket_price = basket.mid()
+        underlying_price = sum(qty * comp.mid() for comp, qty in components)
 
-        # Fair Price of the Basket Based on Component VWAPs
-        underlying_prc = sum(qty * comp.vwap() for comp, qty in components)
+        spread = basket_price - underlying_price
+        basket.spread_history.append(spread)
 
-        # Price Difference (spread)
-        spread = basket_prc - underlying_prc
+        # Dynamic theta
+        if len(basket.spread_history) >= 5:
+            theta = np.mean(basket.spread_history)
+        else:
+            theta = theta
 
-        # Normalise the Spread by Subtracting Mean Offset
         norm_spread = spread - theta
-
-        # Intalise Orders List
         orders = []
 
-        # If Basket is too Expensive, Sell Basket, Buy Somponents
+        hedge_size = 1  # Set how many baskets worth to arbitrage
+
         if norm_spread > threshold:
-            # Sell Basket
-            orders.append(Order(basket.product, int(basket.worst_bid()), -int(basket.possible_sell_amt())))
-
-            # Buy Components
+            # Basket is too expensive => Sell basket, buy components
+            orders.append(Order(basket.product, int(basket.worst_bid()), -hedge_size))
             for comp, qty in components:
-                orders.append(Order(comp.product, int(comp.worst_ask()), int(comp.possible_buy_amt())))
+                orders.append(Order(comp.product, int(comp.worst_ask()), hedge_size * qty))
 
-        # If Basket is too Cheap, Buy Basket, Sell Components
         elif norm_spread < -threshold:
-            # Buy Basket
-            orders.append(Order(basket.product, int(basket.worst_ask()), int(basket.possible_buy_amt())))
-
-            # Sell Components
+            # Basket is too cheap => Buy basket, sell components
+            orders.append(Order(basket.product, int(basket.worst_ask()), hedge_size))
             for comp, qty in components:
-                orders.append(Order(comp.product, int(comp.worst_bid()), -int(comp.possible_sell_amt())))
-
-        # Return the Order List
-        return orders
-
-        
-        basket_prc = basket.mid
-        underlying_prc = 4 * chocolate.vwap + 6 * strawberries.vwap + 1 * roses.vwap
-        spread = basket_prc - underlying_prc
-        norm_spread = spread - theta
-
-        orders = []
-        if norm_spread > threshold:
-            orders.append(Order(basket.product, int(basket.worst_bid), -int(basket.possible_sell_amt)))
-        elif norm_spread < -threshold:
-            orders.append(Order(basket.product, int(basket.worst_ask), int(basket.possible_buy_amt)))
+                orders.append(Order(comp.product, int(comp.worst_bid()), -hedge_size * qty))
 
         return orders
 
@@ -731,7 +717,7 @@ class Trade:
         
         # Update the historical list with the new midprice
         state.history.append(current_mid)
-        if len(state.history) > 10:
+        if len(state.history) > 8:
             state.history.pop(0)  # Keep the list size at 10
         
         # Calculate mean and std of the historical data
@@ -742,13 +728,13 @@ class Trade:
         z = (current_mid - mean) / std if std > 0 else 0
                 
         # Buy signal when price deviates too far below the mean (mean reversion)
-        if z < -0.15 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
+        if z < -0.5 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
             buy_price = state.best_bid()  # Correct price to buy at
             order_amount = min(20, state.possible_buy_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", buy_price, order_amount))  # Positive = buy
         
         # Sell signal when price deviates too far above the mean (mean reversion)
-        if z > 0.15 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
+        if z > 0.5 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
             sell_price = state.best_ask()  # Correct price to sell at
             order_amount = min(20, state.possible_sell_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", sell_price, -order_amount))  # Negative = sell
@@ -765,7 +751,7 @@ class Trade:
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, theta=380, threshold=30))
+        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, theta=0, threshold=30))
         return orders
     
 
@@ -778,58 +764,9 @@ class Trade:
         components = [(croissants, 4), (jams, 2)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, theta=380, threshold=30))
+        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, theta=0, threshold=30))
         return orders
     
-    
-    # Croissants Strategy (Refined for Price Volatility)
-    def croissants(state: Status) -> list[Order]:
-        # Basic Strategy: place buy and sell orders near the midprice
-        orders = []
-        
-        # Get Current Midprice
-        current_price = state.maxamt_midprc()
-
-        # Place Symmetric Orders with Fixed Quantity
-        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
-
-        # Return the Result
-        return orders
-
-
-    # Jams Strategy (Refined for Price Volatility)
-    def jams(state: Status) -> list[Order]:
-        # Basic Strategy: place buy and sell orders near the midprice
-        orders = []
-        
-        # Get Current Midprice
-        current_price = state.maxamt_midprc()
-
-        # Place Symmetric Orders with Fixed Quantity
-        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
-
-        # Return the Result
-        return orders
-    
-
-    # Djembes Strategy (Refined for Price Volatility)
-    def djembes(state: Status) -> list[Order]:
-        # Basic Strategy: place buy and sell orders near the midprice
-        orders = []
-        
-        # Get Current Midprice
-        current_price = state.maxamt_midprc()
-
-        # Place Symmetric Orders with Fixed Quantity
-        orders.extend(Strategy.arb(state=state, fair_price=current_price))   # Buy Order
-        orders.extend(Strategy.mm_ou(state=state, fair_price=current_price, gamma=0.1, order_amount=20)) # Sell Order
-
-        # Return the Result
-        return orders
-
-
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
 class Trader:
@@ -860,9 +797,6 @@ class Trader:
         # Round 2
         result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
-        result["CROISSANTS"] = Trade.croissants(self.state_CROISSANTS)
-        result["JAMS"] = Trade.jams(self.state_JAMS)
-        result["DJEMBES"] = Trade.djembes(self.state_DJEMBES)
 
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
