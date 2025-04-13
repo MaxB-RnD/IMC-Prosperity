@@ -24,7 +24,12 @@ class Status:
     _position_limit = {
         "RAINFOREST_RESIN": 50,
         "KELP": 50,     
-        "SQUID_INK": 50,        
+        "SQUID_INK": 50,       
+        "PICNIC_BASKET1": 250,
+        "PICNIC_BASKET2": 100,
+        "CROISSANTS": 250,
+        "JAMS": 350,
+        "DJEMB": 60,
     }
 
     # Real-time Position for each Product Initialised to 0
@@ -553,6 +558,9 @@ class Strategy:
 
 
 
+
+
+
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
 class Trade:
     # Rainforest Resin Method
@@ -620,6 +628,19 @@ class Trade:
         
         return orders
 
+    # Picnic Basket #1 Trading Strategy
+    def picnic1(picnic1: Status, crossiants: Status, djemb: Status, jams: Status) -> list[Order]:
+        orders = []
+        orders.extend(Strategy.index_arb(picnic1, crossiants, djemb, jams, threshold=30))
+        # orders.extend(Strategy.informed_trading(roses, basket))
+        return orders
+    
+    # Picnic Basket #2 Trading Strategy
+    def picnic2(picnic2: Status, crossiants: Status, jams: Status) -> list[Order]:
+        orders = []
+        orders.extend(Strategy.index_arb(picnic2, crossiants, jams, threshold=30))
+        # orders.extend(Strategy.informed_trading(roses, basket))
+        return orders
 
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
@@ -628,6 +649,11 @@ class Trader:
     state_RAINFOREST_RESIN = Status('RAINFOREST_RESIN')
     state_KELP = Status('KELP')
     state_SQUID = Status('SQUID_INK')
+    state_PICNIC1 = Status('PICNIC_BASKET1')
+    state_PICNIC2 = Status('PICNIC_BASKET2')
+    state_CROISSANTS = Status('CROISSANTS')
+    state_JAMS = Status('JAMS')
+    state_DJEMB = Status('DJEMB')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -640,7 +666,8 @@ class Trader:
         # Use the Defined Strategies for Each Product
         result["RAINFOREST_RESIN"] = Trade.rainforestresin(self.state_RAINFOREST_RESIN)
         result["KELP"] = Trade.kelp(self.state_KELP)
-        result["SQUID_INK"] = Trade.squid(self.state_SQUID)
+        result["PICNIC1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMB, self.state_JAMS)
+        result["PICNIC2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
 
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
