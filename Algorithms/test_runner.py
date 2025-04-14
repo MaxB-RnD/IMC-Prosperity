@@ -110,12 +110,12 @@ def run_backtest(orderbook_data, trade_data):
 
 # Load and backtest each day's data
 def run_test():
-    orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_0.csv")
-    trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_0.csv")
+    orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-1.csv")
+    trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-1.csv")
     pnl0, final_position0, ts0, pnl_over_time0 = run_backtest(orderbook_data0, trade_data0)
 
-    orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-1.csv")
-    trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-1.csv")
+    orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_0.csv")
+    trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_0.csv")
     pnl1, final_position1, ts1, pnl_over_time1 = run_backtest(orderbook_data1, trade_data1)
 
     orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_1.csv")
