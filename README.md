@@ -1,72 +1,90 @@
-# 🌊 **IMC Prosperity 3 — Round 2 Submission**
+# 🌋 **IMC Prosperity 3 — Round 3 Submission**
 
-Ahoy again, trader! ⚓  
-Welcome to **Round 2** of the **IMC Prosperity 3 Trading Competition**.
+Ahoy once more, trader! 🏴‍☠️  
+Welcome to **Round 3** of the **IMC Prosperity 3 Trading Competition**.
 
-With Round 1 under our belts, we’re no longer just testing the waters — we’re charting a course through increasingly complex markets and challenges. New goods, new puzzles, and sharper rivals await. Let’s dive in. 🌊📈
+With Round 2 behind us, we’ve weathered storms and plundered plenty — but the tides are shifting again. This time, volcanic rumblings bring **fiery new financial instruments**, and a curious visit from some slippery traders of the sea. Let’s hoist the sails and dive in! 🌋📈
 
 ---
 
 ## 🧭 **Overview**
 
-Round 2 expands the archipelago’s offerings with **composite products**, new trading opportunities, and a tactical manual challenge.  
-We’re evolving with the market — adapting strategies, refining edge cases, and embracing complexity.
+Round 3 erupts with **derivative-style trading**, testing our strategic depth and pricing intuition. Meanwhile, new guests arrive with a peculiar marketplace of their own.
 
-> _"You don’t get prosperity by playing it safe."_
+> _“Where there’s smoke, there’s opportunity — if you know how to trade it.”_
 
 ---
 
 ## ⚙️ **Algorithmic Challenge**
 
-The islanders love their picnics — and now, **Picnic Baskets** are part of the trade!
+The islanders have gone wild for **Volcanic Rock** — so much so, they've created **Volcanic Rock Vouchers**: tradable contracts that give you the right to purchase `VOLCANIC_ROCK` at a fixed strike price.
 
-### 🧺 New Products:
+Your goal? Evaluate and trade these vouchers smartly before they expire, balancing **premium cost**, **strike price**, and **time left**. 🧠💰
 
-#### `PICNIC_BASKET1` includes:
-- 6 × `CROISSANTS`  
-- 3 × `JAMS`  
-- 1 × `DJEMBE`
+### 🌋 New Products:
 
-#### `PICNIC_BASKET2` includes:
-- 4 × `CROISSANTS`  
-- 2 × `JAMS`
+Each **Voucher** comes with:
+- A **strike price** (fixed cost to redeem)
+- A **premium** (traded market value)
+- A fixed **expiration** (7 trading days from Round 1 start)
 
-Each individual product (`CROISSANTS`, `JAMS`, `DJEMBES`) is also **tradable on its own**, introducing new arbitrage, decomposition, and bundling opportunities.
+| Product | Strike Price | Position Limit |
+|--------|--------------|----------------|
+| `VOLCANIC_ROCK_VOUCHER_9500` | 9,500 | 200 |
+| `VOLCANIC_ROCK_VOUCHER_9750` | 9,750 | 200 |
+| `VOLCANIC_ROCK_VOUCHER_10000` | 10,000 | 200 |
+| `VOLCANIC_ROCK_VOUCHER_10250` | 10,250 | 200 |
+| `VOLCANIC_ROCK_VOUCHER_10500` | 10,500 | 200 |
+| `VOLCANIC_ROCK` | — | 400 |
 
-### 📈 Position Limits:
-- `CROISSANTS`: 250  
-- `JAMS`: 350  
-- `DJEMBES`: 60  
-- `PICNIC_BASKET1`: 60  
-- `PICNIC_BASKET2`: 100
+By Round 3, **only 5 days remain** until expiry.
 
-Our goal? Identify mispricings between basket components and individual instruments, exploit inefficiencies, and manage inventory risk across multiple correlated assets.
+This challenge is about **option-like valuation** and timing:  
+> _Is the premium worth paying for a chance to redeem at a favorable price?_  
+> _Should we hold or trade the vouchers themselves?_  
+
+Your strategy must be as solid as the rocks you’re trading.
 
 ---
 
-## 💸 **Manual Challenge**
+## 🐢 **Manual Challenge**
 
-Washed ashore: **mystery containers filled with treasure.** But there's a twist — **others are looting them too.**
+A curious convoy of **Sea Turtles** has washed ashore, bearing precious `FLIPPERS` — and they’re open to bids.
 
-### How It Works:
-- Pick **up to 2 containers**.
-  - First pick = free 💰  
-  - Second pick = costs SeaShells 💸
-- Rewards are based on:
-  - **Treasure Multiplier** (up to 90)  
-  - **Number of claimants**  
-  - **Global popularity of the container**
+But beware: they’re picky, and a little... superstitious.
 
-> 🧮 **Reward = (10,000 × multiplier) / (inhabitants + global popularity factor)**
+### 🐚 The Rules:
+- You get **two chances** to submit a bid.
+  - First bid: evaluated independently  
+  - Second bid: compared **globally** across all traders
 
-Choose wisely. A treasure split too many ways might leave you with crumbs.
+- Turtles accept the **lowest bid** above their **secret reserve price**.
+
+- **Reserve Prices**:
+  - Uniformly distributed:
+    - 160–200
+    - 250–320  
+  - Absolutely **no trades** between 200–250. Ancient superstition. Don’t even try.
+
+- **Second Bids**:
+  - If your second bid is **above the global average**, great!
+  - If **below**, you might still get a trade — but your PNL gets scaled:
+    
+    ```p = ((320 – average bid) / (320 – your bid))^3```
+
+> Lower your bid too far, and your profits could vanish like a turtle into the sea...
+
+### 💸 The Reward:
+All acquired `FLIPPERS` can be sold back to the market for **320 SeaShells each** at the end of the round.
 
 ---
 
 ## 🌊 **In Summary**
 
-Round 2 is about **optimization under complexity** — both in trading and strategic decision-making.  
-It’s not just about speed or smarts anymore — it’s about depth, foresight, and finesse.
+Round 3 is where **risk meets reward** — introducing time-decaying opportunities and dynamic, player-influenced outcomes.  
+Success now depends not just on tactical brilliance, but also on understanding **market psychology** and timing your plays.
 
-We’re not just here to survive.  
-We’re here to prosper. 🏝️
+We’re not just navigating the tides.  
+We’re shaping them. 🌅
+
+Let’s make Round 3 our most **prosperous** yet. 🏝️📉📈
