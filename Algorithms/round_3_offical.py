@@ -635,7 +635,7 @@ class Strategy:
         return orders
 
 
-    def basket_arb(basket: Status, components: list[tuple[Status, int]], alpha, threshold, hedge_ratio=0.5):
+    def basket_arb(basket: Status, components: list[tuple[Status, int]], alpha, threshold, hedge_ratio=1):
         """
         Execute arbitrage based on the spread between a basket and its component products with partial hedging.
         
@@ -654,13 +654,17 @@ class Strategy:
         spread = basket_price - underlying_price
         basket.spread_history.append(spread)
 
+        # Delay Trading for a While
+        if len(basket.spread_history) < 100:
+            return []
+
         # Use EMA for Theta
         if hasattr(basket, "ema_theta"):
             basket.ema_theta = alpha * spread + (1 - alpha) * basket.ema_theta
         else:
             basket.ema_theta = spread
         theta = basket.ema_theta
-
+        
         # Normalise the Spread
         norm_spread = spread - theta
         min_profit_margin = 2
@@ -687,18 +691,23 @@ class Strategy:
         # Initalise Order List
         orders = []
 
-        # Delay Trading for a While
-        if len(basket.spread_history) < 10:
-            return []
-
         # Basket is Overpriced => Sell Basket
         if norm_spread > threshold:
             orders.append(Order(basket.product, int(basket.worst_bid()), -partial_hedge_size))
+            
+            # Also Sell the Components in the Basket
+            for comp, qty in components:
+                orders.append(Order(comp.product, int(comp.worst_bid()), -qty * partial_hedge_size))
         
         # Basket is Underpriced => Buy Basket
         elif norm_spread < -threshold:
             orders.append(Order(basket.product, int(basket.worst_ask()), partial_hedge_size))
+        
+            # Also buy the Components in the Basket
+            for comp, qty in components:
+                orders.append(Order(comp.product, int(comp.worst_ask()), qty * partial_hedge_size))
 
+        # Return Results
         return orders
     
 
@@ -757,13 +766,13 @@ class Trade:
         z = (current_mid - mean) / std if std > 0 else 0
                 
         # Buy signal when price deviates too far below the mean (mean reversion)
-        if z < -0.5 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
+        if z < -0.25 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
             buy_price = state.best_bid()  # Correct price to buy at
             order_amount = min(20, state.possible_buy_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", buy_price, order_amount))  # Positive = buy
         
         # Sell signal when price deviates too far above the mean (mean reversion)
-        if z > 0.5 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
+        if z > 0.25 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
             sell_price = state.best_ask()  # Correct price to sell at
             order_amount = min(20, state.possible_sell_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", sell_price, -order_amount))  # Negative = sell
@@ -778,9 +787,10 @@ class Trade:
 
         # Make Components
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
+        import numpy as np
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=30))
+        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=1.5))
         return orders
     
 
@@ -793,8 +803,9 @@ class Trade:
         components = [(croissants, 4), (jams, 2)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=30))
+        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=1.5))
         return orders
+
     
     # Volcanic Rock Hedging Strategy (Balck Scholes)
     def rock(volcanic_rock: Status, option: Status) -> list[Order]:
@@ -847,7 +858,7 @@ class Trader:
         result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
 
-        # Round 3
+        # # Round 3
         result["VOLCANIC_ROCK"] = Trade.rock(self.state_VOLCANIC_ROCK, None)
         result["VOLCANIC_ROCK_VOUCHER_9500"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9500)
         result["VOLCANIC_ROCK_VOUCHER_9750"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9750)
