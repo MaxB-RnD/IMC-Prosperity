@@ -690,9 +690,6 @@ class Strategy:
 
 
 
-
-
-
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
 class Trade:
     # Rainforest Resin Method
@@ -785,10 +782,6 @@ class Trade:
         # Place and Return Orders
         orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=30))
         return orders
-
-
-    def rock():
-        return
     
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
@@ -805,14 +798,6 @@ class Trader:
     state_CROISSANTS = Status('CROISSANTS')
     state_JAMS = Status('JAMS')
     state_DJEMBES = Status('DJEMBES')
-
-    # Round 3
-    state_VOLCANIC_ROCK = Status('VOLCANIC_ROCK')
-    state_VOLCANIC_ROCK_VOUCHER_9500 = Status('VOLCANIC_ROCK_VOUCHER_9500')
-    state_VOLCANIC_ROCK_VOUCHER_9750 = Status('VOLCANIC_ROCK_VOUCHER_9750')
-    state_VOLCANIC_ROCK_VOUCHER_10000 = Status('VOLCANIC_ROCK_VOUCHER_10000`')
-    state_VOLCANIC_ROCK_VOUCHER_10250 = Status('VOLCANIC_ROCK_VOUCHER_10250`')
-    state_VOLCANIC_ROCK_VOUCHER_10500 = Status('VOLCANIC_ROCK_VOUCHER_10500`')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -832,13 +817,6 @@ class Trader:
         result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
 
-        # Round 3
-        result[:"VOLCANIC_ROCK_VOUCHER_9500"] = Trade.rock()
-        result[:"VOLCANIC_ROCK_VOUCHER_9750"] = Trade.rock()
-        result[:"VOLCANIC_ROCK_VOUCHER_10000"] = Trade.rock()
-        result[:"VOLCANIC_ROCK_VOUCHER_10250"] = Trade.rock()
-        result[:"VOLCANIC_ROCK_VOUCHER_10500"] = Trade.rock()
-        
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
         conversions = 1        # Indicates that a conversion was made (1 = conversion request, 0 = no request)
