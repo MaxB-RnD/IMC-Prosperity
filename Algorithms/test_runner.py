@@ -1,6 +1,8 @@
 import csv
+import matplotlib.pyplot as plt
 from datamodel import OrderDepth, TradingState, Observation
 from round_2_offical import Trader
+
 
 # Load Historical Market States
 def load_order_book_data(file_path):
@@ -30,6 +32,7 @@ def load_order_book_data(file_path):
                     order_depth.sell_orders[int(price)] = int(vol)
         return data_by_timestamp
 
+
 # Load executed trades (historical prices)
 def load_trade_data(file_path):
     with open(file_path, newline='') as f:
@@ -46,11 +49,11 @@ def load_trade_data(file_path):
             trades_by_ts[ts].append((symbol, price, qty))
         return trades_by_ts
 
-# Run the backtest with error handling
+
+# Run the backtest and track PnL at each timestamp
 def run_backtest(orderbook_data, trade_data):
     trader = Trader()
     
-    # Update position and pnl to include new products
     position = {
         "RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0,
         "CROISSANTS": 0, "JAMS": 0, "DJEMBES": 0,
@@ -61,6 +64,9 @@ def run_backtest(orderbook_data, trade_data):
         "CROISSANTS": 0.0, "JAMS": 0.0, "DJEMBES": 0.0,
         "PICNIC_BASKET1": 0.0, "PICNIC_BASKET2": 0.0
     }
+
+    pnl_over_time = []
+    timestamps = []
 
     for ts in sorted(orderbook_data.keys()):
         state = TradingState(
@@ -94,35 +100,48 @@ def run_backtest(orderbook_data, trade_data):
                     pnl[product] += price * (-volume)
                     position[product] += volume
 
-    return pnl, position
+        # Track total PnL across all products
+        total_pnl = sum(pnl.values())
+        pnl_over_time.append(total_pnl)
+        timestamps.append(ts)
 
-# Load everything and run it
-orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_0.csv")
-trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_0.csv")
-pnl0, final_position0 = run_backtest(orderbook_data0, trade_data0)
+    return pnl, position, timestamps, pnl_over_time
 
-orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-1.csv")
-trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-1.csv")
-pnl1, final_position1 = run_backtest(orderbook_data1, trade_data1)
 
-orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_1.csv")
-trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_1.csv")
-pnl2, final_position2 = run_backtest(orderbook_data2, trade_data2)
+# Load and backtest each day's data
+def run_test():
+    orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_0.csv")
+    trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_0.csv")
+    pnl0, final_position0, ts0, pnl_over_time0 = run_backtest(orderbook_data0, trade_data0)
 
-# Add totals for PnL
-pnl_total = {}
-for product in pnl0:
-    pnl_total[product] = pnl0[product] + pnl1[product] + pnl2[product]
+    orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_-1.csv")
+    trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_-1.csv")
+    pnl1, final_position1, ts1, pnl_over_time1 = run_backtest(orderbook_data1, trade_data1)
 
-# Add totals for Final Positions
-final_position_total = {}
-for product in final_position0:
-    final_position_total[product] = final_position0[product] + final_position1[product] + final_position2[product]
+    orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_2_day_1.csv")
+    trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_2_day_1.csv")
+    pnl2, final_position2, ts2, pnl_over_time2 = run_backtest(orderbook_data2, trade_data2)
 
-# Print Results
-print("PnL Summary:")
-for product in pnl_total:
-    print(f"{product}: {pnl_total[product]:.2f} seashells")
+    # Add totals for PnL
+    pnl_total = {}
+    for product in pnl0:
+        pnl_total[product] = pnl0[product] + pnl1[product] + pnl2[product]
 
-print("\nFinal Positions:")
-print(final_position_total)
+    # Add totals for Final Positions
+    final_position_total = {}
+    for product in final_position0:
+        final_position_total[product] = final_position0[product] + final_position1[product] + final_position2[product]
+
+    # Print Results
+    print("PnL Summary:")
+    for product in pnl_total:
+        print(f"{product}: {pnl_total[product]:.2f} seashells")
+
+    print("\nFinal Positions:")
+    print(final_position_total)
+
+    # Combine PnL over time
+    combined_ts = ts0 + ts1 + ts2
+    combined_pnl = pnl_over_time0 + pnl_over_time1 + pnl_over_time2
+
+    return combined_ts, combined_pnl

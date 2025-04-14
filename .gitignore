@@ -33,3 +33,6 @@ coverage.xml
 *.pyc
 *.pyo
 *.pyd
+
+# Virtual Enviroments
+venv310/

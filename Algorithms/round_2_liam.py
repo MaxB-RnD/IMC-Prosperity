@@ -7,7 +7,7 @@ import math
 from typing import Any
 
 # Import the Platform's Provided Classes and Types
-from datamodel import * 
+from Algorithms.Utils.datamodel import * 
 
 # Used for Gaussian Distribution Modeling if Needed
 from statistics import NormalDist 

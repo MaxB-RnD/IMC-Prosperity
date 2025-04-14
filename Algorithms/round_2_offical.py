@@ -64,6 +64,9 @@ class Status:
         # Keeps Last 100 Spreads
         self.spread_history = deque(maxlen=100)
 
+        # Theta Save 
+        self.ema_theta = 0.0
+
 
     def update(self, state: TradingState) -> None:
         """
@@ -627,50 +630,66 @@ class Strategy:
         return orders
 
 
-    def basket_arb(basket: Status, components: list[tuple[Status, int]], theta, threshold):
+    def basket_arb(basket: Status, components: list[tuple[Status, int]], alpha, threshold):
         """
         Execute arbitrage based on the spread between a basket and its component products.
         
         Parameters:
             basket (Status): Status object for the basket product.
             components (list of (Status, int)): List of tuples with component product status and quantity in the basket.
-            theta (float): The average (or expected) spread between basket and component prices.
+            alpha (float): EMA smoothing factor.
             threshold (float): Minimum deviation from theta to trigger a trade.
 
         Returns:
             list[Order]: List of orders to exploit arbitrage opportunities.
         """
-        # Mid Price of the Basket
         basket_price = basket.mid()
         underlying_price = sum(qty * comp.mid() for comp, qty in components)
-
         spread = basket_price - underlying_price
         basket.spread_history.append(spread)
 
-        # Dynamic theta
-        if len(basket.spread_history) >= 5:
-            theta = np.mean(basket.spread_history)
+        # Use EMA for Theta
+        if hasattr(basket, "ema_theta"):
+            basket.ema_theta = alpha * spread + (1 - alpha) * basket.ema_theta
         else:
-            theta = theta
+            basket.ema_theta = spread
+        theta = basket.ema_theta
 
+        # Normalise the Spread
         norm_spread = spread - theta
+        min_profit_margin = 2
+        if abs(norm_spread) < threshold + min_profit_margin:
+            return []
+
+        # Determine the Maximum Allowable Hedge Size (inventory constraints)
+        max_hedge = min(
+            basket.position_limit() - abs(basket.position()),
+            *[
+                (comp.position_limit() - abs(comp.position())) // qty 
+                for comp, qty in components
+            ]
+        )
+
+        # Dynamically Scale Hedge Size Based on how far norm_spread is Beyond Threshold
+        aggressiveness = 1  # tune this as a scaling factor
+        scaled_hedge = int(min(max_hedge, aggressiveness * (abs(norm_spread) - threshold)))
+        hedge_size = max(1, scaled_hedge)
+
+        # Initalise Order List
         orders = []
 
-        hedge_size = 1  # Set how many baskets worth to arbitrage
-
+        # Basket is Overpriced => Sell Basket
         if norm_spread > threshold:
-            # Basket is too expensive => Sell basket, buy components
             orders.append(Order(basket.product, int(basket.worst_bid()), -hedge_size))
-            for comp, qty in components:
-                orders.append(Order(comp.product, int(comp.worst_ask()), hedge_size * qty))
-
+        
+        # Basket is underpriced => Buy Basket
         elif norm_spread < -threshold:
-            # Basket is too cheap => Buy basket, sell components
             orders.append(Order(basket.product, int(basket.worst_ask()), hedge_size))
-            for comp, qty in components:
-                orders.append(Order(comp.product, int(comp.worst_bid()), -hedge_size * qty))
 
         return orders
+
+
+
 
 
 
@@ -751,7 +770,7 @@ class Trade:
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, theta=0, threshold=30))
+        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=30))
         return orders
     
 
@@ -764,21 +783,36 @@ class Trade:
         components = [(croissants, 4), (jams, 2)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, theta=0, threshold=30))
+        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=30))
         return orders
+
+
+    def rock():
+        return
     
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
 class Trader:
     # Create One Status Object Per Product
+    # Round 1
     state_RAINFOREST_RESIN = Status('RAINFOREST_RESIN')
     state_KELP = Status('KELP')
     state_SQUID = Status('SQUID_INK')
+
+    # Round 2
     state_PICNIC1 = Status('PICNIC_BASKET1')
     state_PICNIC2 = Status('PICNIC_BASKET2')
     state_CROISSANTS = Status('CROISSANTS')
     state_JAMS = Status('JAMS')
     state_DJEMBES = Status('DJEMBES')
+
+    # Round 3
+    state_VOLCANIC_ROCK = Status('VOLCANIC_ROCK')
+    state_VOLCANIC_ROCK_VOUCHER_9500 = Status('VOLCANIC_ROCK_VOUCHER_9500')
+    state_VOLCANIC_ROCK_VOUCHER_9750 = Status('VOLCANIC_ROCK_VOUCHER_9750')
+    state_VOLCANIC_ROCK_VOUCHER_10000 = Status('VOLCANIC_ROCK_VOUCHER_10000`')
+    state_VOLCANIC_ROCK_VOUCHER_10250 = Status('VOLCANIC_ROCK_VOUCHER_10250`')
+    state_VOLCANIC_ROCK_VOUCHER_10500 = Status('VOLCANIC_ROCK_VOUCHER_10500`')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -798,6 +832,13 @@ class Trader:
         result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
 
+        # Round 3
+        result[:"VOLCANIC_ROCK_VOUCHER_9500"] = Trade.rock()
+        result[:"VOLCANIC_ROCK_VOUCHER_9750"] = Trade.rock()
+        result[:"VOLCANIC_ROCK_VOUCHER_10000"] = Trade.rock()
+        result[:"VOLCANIC_ROCK_VOUCHER_10250"] = Trade.rock()
+        result[:"VOLCANIC_ROCK_VOUCHER_10500"] = Trade.rock()
+        
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
         conversions = 1        # Indicates that a conversion was made (1 = conversion request, 0 = no request)
