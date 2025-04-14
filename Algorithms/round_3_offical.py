@@ -29,6 +29,12 @@ class Status:
         "CROISSANTS": 250,
         "JAMS": 350,
         "DJEMBES": 60,
+        "VOLCANIC_ROCK": 400,
+        "VOLCANIC_ROCK_VOUCHER_9500": 200,
+        "VOLCANIC_ROCK_VOUCHER_9750": 200,
+        "VOLCANIC_ROCK_VOUCHER_10000": 200,
+        "VOLCANIC_ROCK_VOUCHER_10250": 200,
+        "VOLCANIC_ROCK_VOUCHER_10500": 200,
     }
 
     # Real-time Position for each Product Initialised to 0
@@ -682,7 +688,7 @@ class Strategy:
         orders = []
 
         # Delay Trading for a While
-        if len(basket.spread_history) < 100:
+        if len(basket.spread_history) < 10:
             return []
 
         # Basket is Overpriced => Sell Basket
@@ -790,6 +796,15 @@ class Trade:
         orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=30))
         return orders
     
+    # Volcanic Rock Hedging Strategy (Balck Scholes)
+    def rock(volcanic_rock: Status, option: Status) -> list[Order]:
+        # Intalise Orders
+        orders = []
+
+        # Return Orders
+        return orders
+
+    
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
 class Trader:
@@ -805,6 +820,14 @@ class Trader:
     state_CROISSANTS = Status('CROISSANTS')
     state_JAMS = Status('JAMS')
     state_DJEMBES = Status('DJEMBES')
+
+    # Round 3
+    state_VOLCANIC_ROCK = Status('state_VOLCANIC_ROCK')
+    state_VOLCANIC_ROCK_VOUCHER_9500 = Status('state_VOLCANIC_ROCK_VOUCHER_9500')
+    state_VOLCANIC_ROCK_VOUCHER_9750 = Status('state_VOLCANIC_ROCK_VOUCHER_9750')
+    state_VOLCANIC_ROCK_VOUCHER_10000 = Status('state_VOLCANIC_ROCK_VOUCHER_10000')
+    state_VOLCANIC_ROCK_VOUCHER_10250 = Status('state_VOLCANIC_ROCK_VOUCHER_10250')
+    state_VOLCANIC_ROCK_VOUCHER_10500 = Status('state_VOLCANIC_ROCK_VOUCHER_10500')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -823,6 +846,14 @@ class Trader:
         # Round 2
         result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
+
+        # Round 3
+        result["VOLCANIC_ROCK"] = Trade.rock(self.state_VOLCANIC_ROCK, None)
+        result["VOLCANIC_ROCK_VOUCHER_9500"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9500)
+        result["VOLCANIC_ROCK_VOUCHER_9750"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9750)
+        result["VOLCANIC_ROCK_VOUCHER_10000"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_10000)
+        result["VOLCANIC_ROCK_VOUCHER_10250"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_10250)
+        result["VOLCANIC_ROCK_VOUCHER_10500"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_10500)
 
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
