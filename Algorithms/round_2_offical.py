@@ -1,5 +1,4 @@
 ### ROUND 2 GAME DAY FILE
-
 # Import Required Libraries
 import json
 import numpy as np
@@ -630,21 +629,22 @@ class Strategy:
         return orders
 
 
-    def basket_arb(basket: Status, components: list[tuple[Status, int]], alpha, threshold):
+    def basket_arb(basket: Status, components: list[tuple[Status, int]], alpha, threshold, hedge_ratio=0.5):
         """
-        Execute arbitrage based on the spread between a basket and its component products.
+        Execute arbitrage based on the spread between a basket and its component products with partial hedging.
         
         Parameters:
             basket (Status): Status object for the basket product.
             components (list of (Status, int)): List of tuples with component product status and quantity in the basket.
             alpha (float): EMA smoothing factor.
             threshold (float): Minimum deviation from theta to trigger a trade.
-
+            hedge_ratio (float): The percentage of the exposure to hedge (default 50%).
+            
         Returns:
             list[Order]: List of orders to exploit arbitrage opportunities.
         """
         basket_price = basket.mid()
-        underlying_price = sum(qty * comp.mid() for comp, qty in components)
+        underlying_price = sum(qty * comp.vwap() for comp, qty in components)
         spread = basket_price - underlying_price
         basket.spread_history.append(spread)
 
@@ -671,23 +671,30 @@ class Strategy:
         )
 
         # Dynamically Scale Hedge Size Based on how far norm_spread is Beyond Threshold
-        aggressiveness = 1  # tune this as a scaling factor
+        aggressiveness = 2  # tune this as a scaling factor
         scaled_hedge = int(min(max_hedge, aggressiveness * (abs(norm_spread) - threshold)))
         hedge_size = max(1, scaled_hedge)
+
+        # Apply the Partial Hedge Ratio
+        partial_hedge_size = int(hedge_size * hedge_ratio)
 
         # Initalise Order List
         orders = []
 
+        # Delay Trading for a While
+        if len(basket.spread_history) < 100:
+            return []
+
         # Basket is Overpriced => Sell Basket
         if norm_spread > threshold:
-            orders.append(Order(basket.product, int(basket.worst_bid()), -hedge_size))
+            orders.append(Order(basket.product, int(basket.worst_bid()), -partial_hedge_size))
         
-        # Basket is underpriced => Buy Basket
+        # Basket is Underpriced => Buy Basket
         elif norm_spread < -threshold:
-            orders.append(Order(basket.product, int(basket.worst_ask()), hedge_size))
+            orders.append(Order(basket.product, int(basket.worst_ask()), partial_hedge_size))
 
         return orders
-
+    
 
 
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
