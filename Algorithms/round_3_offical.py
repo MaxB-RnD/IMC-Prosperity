@@ -1,4 +1,4 @@
-### ROUND 2 GAME DAY FILE
+### ROUND 3 GAME DAY FILE
 # Import Required Libraries
 import json
 import numpy as np
@@ -10,7 +10,8 @@ from typing import Any
 from datamodel import * 
 
 # Used for Gaussian Distribution Modeling if Needed
-from statistics import NormalDist 
+from scipy.stats import norm
+from scipy.optimize import minimize_scalar
 
 
 # CLASS FOR TRACKING MARKET STATUS AND HISTORICAL DATA
@@ -390,7 +391,7 @@ class Status:
         
         # If No Buy Orders Exist, Return the Best Ask Price Minus 1
         else:
-            return self.best_ask - 1
+            return self.best_ask() - 1
 
 
     def best_ask(self) -> int:
@@ -411,7 +412,7 @@ class Status:
             return min(sell_orders.keys())
         else:
             # If No Sell Orders Exist, Return the Best Bid Price Plus 1
-            return self.best_bid + 1
+            return self.best_bid() + 1
     
 
     def mid(self) -> float:
@@ -478,6 +479,39 @@ class Status:
         # Compute the Average Weighted by Total Volume
         vwap /= total_amt
         return vwap
+        
+
+    def bs_call_price(S, K, T, sigma, r=0):
+        d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma * np.sqrt(T))
+        d2 = d1 - sigma * np.sqrt(T)
+        return S * norm.cdf(d1) - K * np.exp(-r*T) * norm.cdf(d2)
+
+
+    def implied_volatility(S, K, T, market_price):
+        def objective(sigma):
+            if sigma <= 0: return np.inf
+            return (Status.bs_call_price(S, K, T, sigma) - market_price)**2
+        result = minimize_scalar(objective, bounds=(0.01, 5), method='bounded')
+        return result.x if result.success else None
+
+
+    def moneyness(K, S, T):
+        return np.log(K/S) / np.sqrt(T)
+
+
+    def fit_iv_curve(strikes, spot, T, market_prices):
+        points = []
+        for K, V in zip(strikes, market_prices):
+            iv = Status.implied_volatility(spot, K, T, V)
+            if iv:
+                m = Status.moneyness(K, spot, T)
+                points.append((m, iv))
+        if len(points) >= 3:
+            m_vals, iv_vals = zip(*points)
+            coeffs = np.polyfit(m_vals, iv_vals, deg=2)
+            return coeffs
+        return None
+
 
 
 
@@ -711,6 +745,86 @@ class Strategy:
         return orders
     
 
+    # Delta Hedging Using the Black Scholes Model
+    from functools import lru_cache
+
+    @lru_cache(maxsize=1000)
+    def cached_iv(S, K, T, Vt):
+        return Status.implied_volatility(S, K, T, Vt)
+
+    def delta_hedge(underlying: Status, options: list[Status], current_round: int) -> list[Order]:
+        orders = []
+        r = 0.0
+        TTE = max(0.01, (7 - current_round) / 365)
+
+        # 1. Spot price
+        underlying_bid, underlying_ask = underlying.best_bid(), underlying.best_ask()
+        if not all([underlying_bid, underlying_ask]):
+            return []
+        S = (underlying_bid + underlying_ask) / 2
+
+        strikes, market_prices, m_list, iv_list, option_data = [], [], [], [], []
+
+        for option in options:
+            K = float(option.product.split('_')[-1])
+            option_bid, option_ask = option.best_bid(), option.best_ask()
+            if not all([option_bid, option_ask]):
+                continue
+
+            Vt = (option_bid + option_ask) / 2
+            iv = Strategy.cached_iv(S, K, TTE, Vt)
+            if iv is None:
+                continue
+
+            m = Status.moneyness(K, S, TTE)
+
+            strikes.append(K)
+            market_prices.append(Vt)
+            m_list.append(m)
+            iv_list.append(iv)
+            option_data.append((option, K, Vt, iv, m))
+
+        if len(m_list) < 3:
+            return []
+
+        # 2. Fit implied volatility curve
+        coeffs = np.polyfit(m_list, iv_list, 2)
+        fitted_vol = lambda m: np.polyval(coeffs, m)
+
+        # 3. Mispricing + hedging
+        for option, K, Vt, iv, m in option_data:
+            fair_iv = fitted_vol(m)
+            mispricing = iv - fair_iv
+         
+            TRADE_SIZE = 1  # or 2 or more depending on risk
+
+            if abs(mispricing) > 0.02:  # Mispricing threshold
+                        sigma = fair_iv
+                        sqrt_T = np.sqrt(TTE)
+                        log_term = np.log(S / K)
+
+                        # Calculate d1 from Black-Scholes
+                        d1 = (log_term + (r + 0.5 * sigma**2) * TTE) / (sigma * sqrt_T)
+                        delta = norm.cdf(d1)
+
+                        # Entry: Open a position on the mispriced option
+                        side = -1 if mispricing > 0 else 1  # overvalued → sell, undervalued → buy
+                        price = option.best_bid() if side < 0 else option.best_ask()
+                        orders.append(Order(option.product, price, side * 1))  # TRADE_SIZE is 1
+
+                        # Compute the hedge
+                        new_position = option.position() + side * 1  # Simulate new position
+                        hedge_qty = round(delta * new_position)
+                        underlying_pos = underlying.position()
+                        hedge_needed = hedge_qty - underlying_pos
+
+                        if abs(hedge_needed) > 0:
+                            hedge_price = underlying.best_ask() if hedge_needed > 0 else underlying.best_bid()
+                            orders.append(Order(underlying.product, hedge_price, hedge_needed))
+
+        return orders
+
+
 
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
 class Trade:
@@ -808,14 +922,18 @@ class Trade:
 
     
     # Volcanic Rock Hedging Strategy (Balck Scholes)
-    def rock(volcanic_rock: Status, option: Status) -> list[Order]:
+    def rock(volcanic_rock: Status, voucher_9500: Status, voucher_9750: Status, voucher_10000: Status, voucher_10250: Status, voucher_10500: Status) -> list[Order]:
         # Intalise Orders
         orders = []
 
-        # Return Orders
-        return orders
+        # Make Options List
+        options_list = [voucher_9500, voucher_9750, voucher_10000, voucher_10250, voucher_10500]
 
+        # Place and Return Orders
+        orders.extend(Strategy.delta_hedge(underlying=volcanic_rock, options=options_list, current_round = 3)) # Update Round?
+        return orders
     
+
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT
 class Trader:
@@ -833,12 +951,12 @@ class Trader:
     state_DJEMBES = Status('DJEMBES')
 
     # Round 3
-    state_VOLCANIC_ROCK = Status('state_VOLCANIC_ROCK')
-    state_VOLCANIC_ROCK_VOUCHER_9500 = Status('state_VOLCANIC_ROCK_VOUCHER_9500')
-    state_VOLCANIC_ROCK_VOUCHER_9750 = Status('state_VOLCANIC_ROCK_VOUCHER_9750')
-    state_VOLCANIC_ROCK_VOUCHER_10000 = Status('state_VOLCANIC_ROCK_VOUCHER_10000')
-    state_VOLCANIC_ROCK_VOUCHER_10250 = Status('state_VOLCANIC_ROCK_VOUCHER_10250')
-    state_VOLCANIC_ROCK_VOUCHER_10500 = Status('state_VOLCANIC_ROCK_VOUCHER_10500')
+    state_VOLCANIC_ROCK = Status('VOLCANIC_ROCK')
+    state_VOLCANIC_ROCK_VOUCHER_9500 = Status('VOLCANIC_ROCK_VOUCHER_9500')
+    state_VOLCANIC_ROCK_VOUCHER_9750 = Status('VOLCANIC_ROCK_VOUCHER_9750')
+    state_VOLCANIC_ROCK_VOUCHER_10000 = Status('VOLCANIC_ROCK_VOUCHER_10000')
+    state_VOLCANIC_ROCK_VOUCHER_10250 = Status('VOLCANIC_ROCK_VOUCHER_10250')
+    state_VOLCANIC_ROCK_VOUCHER_10500 = Status('VOLCANIC_ROCK_VOUCHER_10500')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -859,12 +977,7 @@ class Trader:
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
 
         # # Round 3
-        result["VOLCANIC_ROCK"] = Trade.rock(self.state_VOLCANIC_ROCK, None)
-        result["VOLCANIC_ROCK_VOUCHER_9500"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9500)
-        result["VOLCANIC_ROCK_VOUCHER_9750"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9750)
-        result["VOLCANIC_ROCK_VOUCHER_10000"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_10000)
-        result["VOLCANIC_ROCK_VOUCHER_10250"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_10250)
-        result["VOLCANIC_ROCK_VOUCHER_10500"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_10500)
+        result["VOLCANIC_ROCK"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9500, self.state_VOLCANIC_ROCK_VOUCHER_9750, self.state_VOLCANIC_ROCK_VOUCHER_10000, self.state_VOLCANIC_ROCK_VOUCHER_10250, self.state_VOLCANIC_ROCK_VOUCHER_10500)
 
         # Return Orders, Conversions (0 = no request), and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution

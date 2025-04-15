@@ -55,14 +55,25 @@ def run_backtest(orderbook_data, trade_data):
     trader = Trader()
     
     position = {
-        "RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0,
-        "CROISSANTS": 0, "JAMS": 0, "DJEMBES": 0,
-        "PICNIC_BASKET1": 0, "PICNIC_BASKET2": 0
+    "RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0,
+    "PICNIC_BASKET1": 0, "PICNIC_BASKET2": 0,
+    "VOLCANIC_ROCK": 0,
+    "VOLCANIC_ROCK_VOUCHER_9500": 0,
+    "VOLCANIC_ROCK_VOUCHER_9750": 0,
+    "VOLCANIC_ROCK_VOUCHER_10000": 0,
+    "VOLCANIC_ROCK_VOUCHER_10250": 0,
+    "VOLCANIC_ROCK_VOUCHER_10500": 0,
     }
+
     pnl = {
         "RAINFOREST_RESIN": 0.0, "KELP": 0.0, "SQUID_INK": 0.0,
-        "CROISSANTS": 0.0, "JAMS": 0.0, "DJEMBES": 0.0,
-        "PICNIC_BASKET1": 0.0, "PICNIC_BASKET2": 0.0
+        "PICNIC_BASKET1": 0.0, "PICNIC_BASKET2": 0.0,
+        "VOLCANIC_ROCK": 0.0,
+        "VOLCANIC_ROCK_VOUCHER_9500": 0.0,
+        "VOLCANIC_ROCK_VOUCHER_9750": 0.0,
+        "VOLCANIC_ROCK_VOUCHER_10000": 0.0,
+        "VOLCANIC_ROCK_VOUCHER_10250": 0.0,
+        "VOLCANIC_ROCK_VOUCHER_10500": 0.0,
     }
 
     pnl_over_time = []
