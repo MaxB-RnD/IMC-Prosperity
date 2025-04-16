@@ -508,7 +508,6 @@ class Status:
         Calculate the time to expiration (tau) based on the current round, considering that the expiration time
         decreases linearly over the rounds.
         """
-
         # Calculate linear decrease in expiration time (T) over rounds
         T = T_start - (day - 1) * (T_start - T_end) / (total_rounds - 1)
         
