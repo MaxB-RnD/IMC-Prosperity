@@ -71,6 +71,9 @@ class Status:
 
         # Theta Save 
         self.ema_theta = 0.0
+
+        # Assign Volatility 
+        self.sigma = 0.0
     
 
     def strike_price(self) -> float:
@@ -516,17 +519,17 @@ class Status:
         return T - ((day - 1) * 20000 + timestep) * 2e-7
 
 
-    def cal_call(self, S, tau, K, sigma=0.16, r=0):
+    def cal_call(self, S, tau, K, r=0):
         norm = NormalDist()  # create a standard normal distribution
-        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * tau) / (sigma * math.sqrt(tau))
+        d1 = (np.log(S / K) + (r + 0.5 * self.sigma**2) * tau) / (self.sigma * math.sqrt(tau))
         delta = norm.cdf(d1)
-        d2 = d1 - sigma * np.sqrt(tau)
+        d2 = d1 - self.sigma * np.sqrt(tau)
         call_price = S * delta - K * math.exp(-r * tau) * norm.cdf(d2)
         return call_price, delta
 
 
     def cal_imvol(self, market_price, S, tau, K, r=0, tol=1e-6, max_iter=100):
-        sigma = 0.16
+        sigma = self.sigma
         diff = self.cal_call(S, tau, sigma)[0] - market_price
 
         iter_count = 0
@@ -551,12 +554,6 @@ class Status:
         Property that returns the total ask amount for the current product as a negative value
         """
         return -sum(self._state.order_depths[self.product].sell_orders.values())
-    
-
-    def calc_hv(self, window=10):
-        prices = self.hist_mid_prc(window)
-        returns = np.diff(np.log(prices))
-        return np.std(returns) * np.sqrt(252)  # annualized
     
 
 
@@ -791,7 +788,7 @@ class Strategy:
 
 
     # Volume Trading Arbitrage for Exploitting Options
-    def vol_arb(option: Status, iv, hv=0.16, threshold=0.0012):
+    def vol_arb(option: Status, iv, hv, threshold=0.0012):
         vol_spread = iv - hv
         orders = []
 
@@ -908,7 +905,6 @@ class Trade:
 
         # Make Components
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
-        import numpy as np
 
         # Place and Return Orders
         orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=1.5))
@@ -932,6 +928,13 @@ class Trade:
     def rock(volcanic_rock: Status, voucher_9500: Status, voucher_9750: Status, voucher_10000: Status, voucher_10250: Status, voucher_10500: Status) -> list[Order]:
         result: list[Order] = []
 
+        # Define Sigmas
+        voucher_9500.sigma = 0.004
+        voucher_9750.sigma = 0.006
+        voucher_10000.sigma  = 0.02
+        voucher_10250.sigma  = 0.025
+        voucher_10500.sigma  = 0.065
+
         vouchers = [
             voucher_9500,
             voucher_9750,
@@ -951,17 +954,13 @@ class Trade:
             theo, delta = option.cal_call(underlying_prc, tau, K=strike)
             iv = option.cal_imvol(option_prc, underlying_prc, tau, K=strike)
 
-            # New: Adjust historical volatility (adaptive)
-            hv_window = 15
-            hv = option.calc_hv(window=hv_window)
-
             # Adjusted: Smaller threshold to be more responsive
             threshold = 0.0012
-            result.extend(Strategy.vol_arb(option, iv, hv=hv, threshold=threshold))
+            result.extend(Strategy.vol_arb(option=option, iv=iv, hv=option.sigma, threshold=threshold))
 
             # Adjusted: Tighter delta rebalance to avoid drifting exposure
             rebalance_threshold = 30
-            result.extend(Strategy.delta_hedge(underlying, option, delta, rebalance_threshold=rebalance_threshold))
+            result.extend(Strategy.delta_hedge(underlying=underlying, options=option, delta=delta, rebalance_threshold=rebalance_threshold))
 
         return result
 
