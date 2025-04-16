@@ -752,40 +752,88 @@ class Strategy:
     def cached_iv(S, K, T, Vt):
         return Status.implied_volatility(S, K, T, Vt)
 
-    def delta_hedge(underlying: Status, options: list[Status], current_round: int) -> list[Order]:
+    def delta_hedge(underlying: Status, options: list[Status], current_round: int) -> list:
         orders = []
         r = 0.0
-        TTE = max(0.01, (7 - current_round) / 365)
-
+        TTE = max(0.01, (8 - current_round) / 365)
+    
         # 1. Spot price
         underlying_bid, underlying_ask = underlying.best_bid(), underlying.best_ask()
         if not all([underlying_bid, underlying_ask]):
             return []
         S = (underlying_bid + underlying_ask) / 2
-
+    
         strikes, market_prices, m_list, iv_list, option_data = [], [], [], [], []
-
+    
         for option in options:
             K = float(option.product.split('_')[-1])
             option_bid, option_ask = option.best_bid(), option.best_ask()
             if not all([option_bid, option_ask]):
                 continue
-
+    
+            # ✅ Skip options with very wide spreads (30% or more)
+            spread = abs(option_ask - option_bid) / option_ask
+            if spread > 0.30:
+                continue
+    
             Vt = (option_bid + option_ask) / 2
-            iv = Strategy.cached_iv(S, K, TTE, Vt)
+            iv = cached_iv(S, K, TTE, Vt)
             if iv is None:
                 continue
-
-            m = Status.moneyness(K, S, TTE)
-
+    
+            m = moneyness(K, S, TTE)
             strikes.append(K)
             market_prices.append(Vt)
             m_list.append(m)
             iv_list.append(iv)
             option_data.append((option, K, Vt, iv, m))
-
+    
         if len(m_list) < 3:
             return []
+    
+        # 2. Fit implied volatility curve
+        coeffs = np.polyfit(m_list, iv_list, 2)
+        fitted_vol = lambda m: np.polyval(coeffs, m)
+    
+        # 3. Mispricing + delta hedge
+        for option, K, Vt, iv, m in option_data:
+            fair_iv = fitted_vol(m)
+            mispricing = iv - fair_iv
+    
+            if abs(mispricing) > 0.02:
+                sigma = fair_iv
+                sqrt_T = np.sqrt(TTE)
+                log_term = np.log(S / K)
+                d1 = (log_term + (r + 0.5 * sigma ** 2) * TTE) / (sigma * sqrt_T)
+                delta = norm.cdf(d1)
+    
+                side = -1 if mispricing > 0 else 1  # overvalued → sell, undervalued → buy
+                price = option.best_bid() if side < 0 else option.best_ask()
+                TRADE_SIZE = 1
+    
+                # ✅ Check position limits before trading
+                if (side > 0 and option.possible_buy_amt() >= TRADE_SIZE) or \
+                   (side < 0 and option.possible_sell_amt() >= TRADE_SIZE):
+                    orders.append(Order(option.product, price, side * TRADE_SIZE))
+    
+                    # Simulate new option position for hedge calculation
+                    new_position = option.position() + side * TRADE_SIZE
+                    hedge_qty = round(delta * new_position)
+                    hedge_needed = hedge_qty - underlying.position()
+    
+                    # ✅ Check underlying position limits
+                    if hedge_needed != 0:
+                        hedge_side = 1 if hedge_needed > 0 else -1
+                        hedge_price = underlying.best_ask() if hedge_side > 0 else underlying.best_bid()
+                        hedge_product_limit = underlying.position_limit()
+    
+                        current_pos = underlying.position()
+                        final_pos = current_pos + hedge_needed
+                        if abs(final_pos) <= hedge_product_limit:
+                            orders.append(Order(underlying.product, hedge_price, hedge_needed))
+    
+        return orders
+
 
         # 2. Fit implied volatility curve
         coeffs = np.polyfit(m_list, iv_list, 2)
