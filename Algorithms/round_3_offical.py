@@ -520,26 +520,56 @@ class Status:
 
 
     def cal_call(self, S, tau, K, r=0):
-        norm = NormalDist()  # create a standard normal distribution
-        d1 = (np.log(S / K) + (r + 0.5 * self.sigma**2) * tau) / (self.sigma * math.sqrt(tau))
-        delta = norm.cdf(d1)
-        d2 = d1 - self.sigma * np.sqrt(tau)
-        call_price = S * delta - K * math.exp(-r * tau) * norm.cdf(d2)
-        return call_price, delta
+        """
+        Calculates the Black-Scholes price of a European call option and its delta (`cal_call`)
+        """
+        # Create a standard normal distribution
+        norm = NormalDist()  
+
+        # d1 term in Black-Scholes
+        d1 = (np.log(S / K) + (r + 0.5 * self.sigma**2) * tau) / (self.sigma * math.sqrt(tau))  
+
+        # Delta of the call option (N(d1))
+        delta = norm.cdf(d1)  
+
+        # d2 term in Black-Scholes
+        d2 = d1 - self.sigma * np.sqrt(tau)  
+
+        # Black-Scholes formula for a european call option
+        call_price = S * delta - K * math.exp(-r * tau) * norm.cdf(d2)  
+
+        # Return both the option price and delta
+        return call_price, delta  
 
 
     def cal_imvol(self, market_price, S, tau, K, r=0, tol=1e-6, max_iter=100):
-        sigma = self.sigma
-        diff = self.cal_call(S, tau, sigma)[0] - market_price
+        """
+        Estimate the implied volatility given a market price using an iterative approach (`cal_imvol`).
+        """
+        # Initial guess for implied volatility
+        sigma = self.sigma  
 
-        iter_count = 0
-        while np.any(np.abs(diff) > tol) and iter_count < max_iter:
-            vega = (self.cal_call(S, tau, sigma+tol)[0] - self.cal_call(S, tau, sigma)[0]) / tol
-            sigma -= diff / vega
-            diff = self.cal_call(S, tau, sigma)[0] - market_price
-            iter_count += 1
+        # Initial pricing error
+        diff = self.cal_call(S, tau, K, r)[0] - market_price  
+
+        # Iteration Counter
+        iter_count = 0  
         
-        return sigma
+        while np.any(np.abs(diff) > tol) and iter_count < max_iter:
+            # Estimate vega numerically using finite differences
+            vega = (self.cal_call(S, tau, K, r)[0] - self.cal_call(S, tau, K, r)[0]) / tol
+
+            # Update sigma using Newton-Raphson method
+            sigma -= diff / vega  
+
+            # Update pricing error
+            diff = self.cal_call(S, tau, K, r)[0] - market_price  
+
+            # Increment iteration count
+            iter_count += 1  
+        
+        # Return the implied volatility
+        return sigma  
     
 
     def total_bidamt(self) -> int:
@@ -787,48 +817,90 @@ class Strategy:
         return orders
 
 
-    # Volume Trading Arbitrage for Exploitting Options
     def vol_arb(option: Status, iv, hv, threshold=0.0012):
-        vol_spread = iv - hv
-        orders = []
+        """
+        Volume Trading Arbitrage for exploiting discrepancies between implied volatility (IV) and historical volatility (HV).
+            - If IV is significantly higher than HV, the option is considered overpriced and a sell order is placed.
+            - If IV is significantly lower than HV, the option is considered underpriced and a buy order is placed.
+        """
+        # Calculate the spread between implied and historical volatility
+        vol_spread = iv - hv  
 
-        if vol_spread > threshold:
-            sell_amount = option.possible_sell_amt()
+        # List to store generated orders
+        orders = []  
+
+        # If IV is significantly higher than HV, consider selling the option
+        if vol_spread > threshold:  
+            # Determine how much can be sold
+            sell_amount = option.possible_sell_amt()  
             if sell_amount > 0:
-                orders.append(Order(option.product, option.worst_bid(), -sell_amount))
-                executed_amount = min(sell_amount, option.total_bidamt())
-                option.rt_position_update(option.rt_position() - executed_amount)
+                # Place a sell order at worst bid
+                orders.append(Order(option.product, option.worst_bid(), -sell_amount))  
 
-        elif vol_spread < -threshold:
-            buy_amount = option.possible_buy_amt()
+                # Estimate the amount likely to be executed
+                executed_amount = min(sell_amount, option.total_bidamt())  
+
+                # Update real-time position
+                option.rt_position_update(option.rt_position() - executed_amount)  
+
+
+        # If IV is significantly lower than HV, consider buying the option
+        elif vol_spread < -threshold: 
+            # Determine how much can be bought 
+            buy_amount = option.possible_buy_amt()  
             if buy_amount > 0:
-                orders.append(Order(option.product, option.worst_ask(), buy_amount))
-                executed_amount = min(buy_amount, option.total_askamt())
-                option.rt_position_update(option.rt_position() + executed_amount)
+                # Place a buy order at worst ask
+                orders.append(Order(option.product, option.worst_ask(), buy_amount))  
 
-        return orders
+                # Estimate the amount likely to be executed
+                executed_amount = min(buy_amount, option.total_askamt())  
+
+                # Update real-time position
+                option.rt_position_update(option.rt_position() + executed_amount)  
+        
+        # Return the list of generated orders
+        return orders  
 
 
-    # Delta Hedging Using the Black Scholes Model
     def delta_hedge(underlying: Status, options: Status, delta, rebalance_threshold=30) -> list:
-        target_position = -round(options.rt_position() * delta)
-        current_position = underlying.position()
+        """
+        Delta_hedge: Delta hedging strategy using the Black-Scholes model to offset the delta risk of options positions by trading the underlying asset.
+            - If the net delta exposure exceeds a rebalance threshold, buy/sell orders are placed on the underlying to maintain a neutral position.
+        """
+        # Desired position in the underlying to hedge option delta
+        target_position = -round(options.rt_position() * delta)  
+
+        # Current position in the underlying
+        current_position = underlying.position()  
+
+        # Difference between target and current position
         position_diff = target_position - current_position
-        orders = []
 
-        if abs(position_diff) > rebalance_threshold:
-            if position_diff < 0:
-                sell_amount = min(abs(position_diff), underlying.possible_sell_amt())
+        # List to store generated hedge orders  
+        orders = []  
+
+        # Only rebalance if the difference exceeds the threshold
+        if abs(position_diff) > rebalance_threshold:  
+            # Need to sell underlying to reduce delta exposure
+            if position_diff < 0:  
+                # How much can be sold
+                sell_amount = min(abs(position_diff), underlying.possible_sell_amt())  
                 if sell_amount > 0:
-                    orders.append(Order(underlying.product, underlying.best_bid(), -sell_amount))
-            elif position_diff > 0:
-                buy_amount = min(position_diff, underlying.possible_buy_amt())
+                    # Sell at best bid
+                    orders.append(Order(underlying.product, underlying.best_bid(), -sell_amount))  
+            
+            # Need to buy underlying to increase delta exposure
+            elif position_diff > 0: 
+                # How much can be bought
+                buy_amount = min(position_diff, underlying.possible_buy_amt())  
                 if buy_amount > 0:
-                    orders.append(Order(underlying.product, underlying.best_ask(), buy_amount))
+                    # Buy at best ask
+                    orders.append(Order(underlying.product, underlying.best_ask(), buy_amount))  
+        
+        # Return the list of hedge orders
+        return orders  
 
-        return orders
     
-
 
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
 class Trade:
@@ -907,7 +979,7 @@ class Trade:
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=1.5))
+        #orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=1.5))
         return orders
     
 
@@ -920,21 +992,22 @@ class Trade:
         components = [(croissants, 4), (jams, 2)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=1.5))
+        #orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=1.5))
         return orders
 
     
-    # Volcanic Rock Hedging Strategy (Balck Scholes)
     def rock(volcanic_rock: Status, voucher_9500: Status, voucher_9750: Status, voucher_10000: Status, voucher_10250: Status, voucher_10500: Status) -> list[Order]:
-        result: list[Order] = []
+        # Stores all generated orders from the strategy
+        result: list[Order] = [] 
 
-        # Define Sigmas
+        # Define historical volatilities (sigmas) for each option voucher
         voucher_9500.sigma = 0.004
         voucher_9750.sigma = 0.006
-        voucher_10000.sigma  = 0.02
-        voucher_10250.sigma  = 0.025
-        voucher_10500.sigma  = 0.065
+        voucher_10000.sigma = 0.02
+        voucher_10250.sigma = 0.025
+        voucher_10500.sigma = 0.065
 
+        # Group all vouchers for iteration
         vouchers = [
             voucher_9500,
             voucher_9750,
@@ -943,26 +1016,43 @@ class Trade:
             voucher_10500
         ]
 
+        # Reference to the underlying asset and its mid price from historical data
         underlying = volcanic_rock
-        underlying_prc = underlying.hist_mid_prc(1)[0]
-        tau = underlying.cal_tau(day=3, timestep=underlying.timestep())
 
+        # Get the last mid price
+        underlying_prc = underlying.hist_mid_prc(1)[0]  
+
+        # Time to expiry in years
+        tau = underlying.cal_tau(day=3, timestep=underlying.timestep())  
+
+        # Iterate over each option (voucher)
         for option in vouchers:
-            option_prc = option.hist_mid_prc(1)[0]
+            # Get the option's last traded mid price
+            option_prc = option.hist_mid_prc(1)[0]  
+            # Option's strike price
+            strike = option.strike_price()  
 
-            strike = option.strike_price()
+            # Calculate theoretical price and delta using Black-Scholes
             theo, delta = option.cal_call(underlying_prc, tau, K=strike)
+
+            # Calculate implied volatility from market price using inverse Black-Scholes
             iv = option.cal_imvol(option_prc, underlying_prc, tau, K=strike)
 
-            # Adjusted: Smaller threshold to be more responsive
-            threshold = 0.0012
+            # Volatility Arbitrage: act if IV deviates enough from HV
+            threshold = 0.0012  # Sensitivity to volatility spread
             result.extend(Strategy.vol_arb(option=option, iv=iv, hv=option.sigma, threshold=threshold))
 
-            # Adjusted: Tighter delta rebalance to avoid drifting exposure
-            rebalance_threshold = 30
-            result.extend(Strategy.delta_hedge(underlying=underlying, options=option, delta=delta, rebalance_threshold=rebalance_threshold))
+            # Delta Hedging: maintain a market-neutral position
+            rebalance_threshold = 30  # Tolerance for position imbalance
+            result.extend(Strategy.delta_hedge(
+                underlying=underlying,
+                options=option,
+                delta=delta,
+                rebalance_threshold=rebalance_threshold
+            ))
 
-        return result
+        # Return all generated orders for execution
+        return result  
 
 
 
