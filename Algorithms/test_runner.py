@@ -1,7 +1,7 @@
 import csv
 import matplotlib.pyplot as plt
 from datamodel import OrderDepth, TradingState, Observation
-from round_3_offical import Trader
+from Algorithms.round_4_offical import Trader
 
 
 # Load Historical Market States
@@ -121,16 +121,16 @@ def run_backtest(orderbook_data, trade_data):
 
 # Load and backtest each day's data
 def run_test():
-    orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_3_day_0.csv")
-    trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_3_day_0.csv")
+    orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_4_day_1.csv")
+    trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_4_day_1.csv")
     pnl0, final_position0, ts0, pnl_over_time0 = run_backtest(orderbook_data0, trade_data0)
 
-    orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_3_day_1.csv")
-    trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_3_day_1.csv")
+    orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_4_day_2.csv")
+    trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_4_day_2.csv")
     pnl1, final_position1, ts1, pnl_over_time1 = run_backtest(orderbook_data1, trade_data1)
 
-    orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_3_day_2.csv")
-    trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_3_day_2.csv")
+    orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_4_day_3.csv")
+    trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_4_day_3.csv")
     pnl2, final_position2, ts2, pnl_over_time2 = run_backtest(orderbook_data2, trade_data2)
 
     # Add totals for PnL

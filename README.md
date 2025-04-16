@@ -1,90 +1,70 @@
-# 🌋 **IMC Prosperity 3 — Round 3 Submission**
+# 🏝️ **IMC Prosperity 3 — Round 4 Submission**
 
-Ahoy once more, trader! 🏴‍☠️  
-Welcome to **Round 3** of the **IMC Prosperity 3 Trading Competition**.
+Ahoy again, Prosperous Pirates! 🏴‍☠️  
+Round 4 has docked — and it brings **culinary delights and suitcase strategy** to test your trading wits and psychological instincts.
 
-With Round 2 behind us, we’ve weathered storms and plundered plenty — but the tides are shifting again. This time, volcanic rumblings bring **fiery new financial instruments**, and a curious visit from some slippery traders of the sea. Let’s hoist the sails and dive in! 🌋📈
-
----
-
-## 🧭 **Overview**
-
-Round 3 erupts with **derivative-style trading**, testing our strategic depth and pricing intuition. Meanwhile, new guests arrive with a peculiar marketplace of their own.
-
-> _“Where there’s smoke, there’s opportunity — if you know how to trade it.”_
+The market grows stranger still, but our resolve? Never stronger. Let’s sink our teeth into this one. 🧁💼
 
 ---
 
-## ⚙️ **Algorithmic Challenge**
+## 🍰 **Algorithmic Challenge: Magnificent Macarons**
 
-The islanders have gone wild for **Volcanic Rock** — so much so, they've created **Volcanic Rock Vouchers**: tradable contracts that give you the right to purchase `VOLCANIC_ROCK` at a fixed strike price.
+The latest luxury commodity on the island is the delectable `MAGNIFICENT_MACARONS`. Prized for their complexity, these sweet treats fluctuate in value based on a recipe of real-world-like factors: ☀️ **sunlight hours**, 💰 **sugar prices**, 🚢 **shipping costs**, 📦 **storage limitations**, and 🎯 **tariffs**.
 
-Your goal? Evaluate and trade these vouchers smartly before they expire, balancing **premium cost**, **strike price**, and **time left**. 🧠💰
+But the macarons come with a twist — you can only get them from **Pristine Cuisine**, and each transaction comes at a **cost**:
 
-### 🌋 New Products:
+### ⚙️ Mechanics
 
-Each **Voucher** comes with:
-- A **strike price** (fixed cost to redeem)
-- A **premium** (traded market value)
-- A fixed **expiration** (7 trading days from Round 1 start)
+- **Buy** from Pristine Cuisine:  
+  - Pay `askPrice` + `TRANSPORT_FEES` + `IMPORT_TARIFF`
 
-| Product | Strike Price | Position Limit |
-|--------|--------------|----------------|
-| `VOLCANIC_ROCK_VOUCHER_9500` | 9,500 | 200 |
-| `VOLCANIC_ROCK_VOUCHER_9750` | 9,750 | 200 |
-| `VOLCANIC_ROCK_VOUCHER_10000` | 10,000 | 200 |
-| `VOLCANIC_ROCK_VOUCHER_10250` | 10,250 | 200 |
-| `VOLCANIC_ROCK_VOUCHER_10500` | 10,500 | 200 |
-| `VOLCANIC_ROCK` | — | 400 |
+- **Sell** to Pristine Cuisine:  
+  - Receive `bidPrice` - `TRANSPORT_FEES` - `EXPORT_TARIFF`
 
-By Round 3, **only 5 days remain** until expiry.
+- **Position Limits**:  
+  - `MAGNIFICENT_MACARONS`: **75**
+  - Conversion Limit: **10 per request**
 
-This challenge is about **option-like valuation** and timing:  
-> _Is the premium worth paying for a chance to redeem at a favorable price?_  
-> _Should we hold or trade the vouchers themselves?_  
+- **Storage Fees**:  
+  - **0.1 Seashells** per timestamp **for every net long unit**  
+  - No storage fee for short positions
 
-Your strategy must be as solid as the rocks you’re trading.
+> _The key: determine true fair value — account for all frictions and forecast supply-demand._  
+> _Buy low, sell high — but storage and conversion costs could eat your profits like ants at a picnic._
 
 ---
 
-## 🐢 **Manual Challenge**
+## 💼 **Manual Challenge: Suitcase Showdown**
 
-A curious convoy of **Sea Turtles** has washed ashore, bearing precious `FLIPPERS` — and they’re open to bids.
+Welcome to the island’s hottest new game show. 🎉  
+Every inhabitant is offered a shot at treasure by opening up to **three** mysterious **suitcases**. The catch? You split the loot — and your curiosity costs coins.
 
-But beware: they’re picky, and a little... superstitious.
+### 🧳 Game Rules:
 
-### 🐚 The Rules:
-- You get **two chances** to submit a bid.
-  - First bid: evaluated independently  
-  - Second bid: compared **globally** across all traders
+- **Open up to 3 suitcases**
+  - First suitcase: **free**
+  - Second/third suitcases: **cost seashells**
 
-- Turtles accept the **lowest bid** above their **secret reserve price**.
+- Each suitcase has:
+  - **Treasure Multiplier** (max 100)
+  - **Inhabitants** (up to 15 choosing the same)
+  - **Global Pick %** (how often this suitcase is chosen)
 
-- **Reserve Prices**:
-  - Uniformly distributed:
-    - 160–200
-    - 250–320  
-  - Absolutely **no trades** between 200–250. Ancient superstition. Don’t even try.
+- **Profit Formula:**
 
-- **Second Bids**:
-  - If your second bid is **above the global average**, great!
-  - If **below**, you might still get a trade — but your PNL gets scaled:
-    
-    ```p = ((320 – average bid) / (320 – your bid))^3```
+```text
+PRIZE = (10,000 × multiplier) / (inhabitants + pickPercentageOfAllSuitcaseOpens)
+```
 
-> Lower your bid too far, and your profits could vanish like a turtle into the sea...
+Your Profit = PRIZE - Opening Costs
 
-### 💸 The Reward:
-All acquired `FLIPPERS` can be sold back to the market for **320 SeaShells each** at the end of the round.
+>_Pick a popular suitcase and your share shrinks. Pick an unpopular one and... maybe it’s empty._🧠
+>_Smart pirates strategize — they don’t just follow the crowd._
 
 ---
 
 ## 🌊 **In Summary**
 
-Round 3 is where **risk meets reward** — introducing time-decaying opportunities and dynamic, player-influenced outcomes.  
-Success now depends not just on tactical brilliance, but also on understanding **market psychology** and timing your plays.
+Round 4 sharpens the edge between **fundamental forecasting** and strategic **resource allocation**. Whether you’re mastering macarons or cracking the suitcase code, only the cleverest will thrive.
 
-We’re not just navigating the tides.  
-We’re shaping them. 🌅
-
-Let’s make Round 3 our most **prosperous** yet. 🏝️📉📈
+Let’s cook up profits — and uncover hidden treasures. 🍬💸
