@@ -864,7 +864,7 @@ class Strategy:
 
     def delta_hedge(underlying: Status, options: Status, delta, rebalance_threshold=30) -> list:
         """
-        Delta_hedge: Delta hedging strategy using the Black-Scholes model to offset the delta risk of options positions by trading the underlying asset.
+        Delta hedging strategy using the Black-Scholes model to offset the delta risk of options positions by trading the underlying asset.
             - If the net delta exposure exceeds a rebalance threshold, buy/sell orders are placed on the underlying to maintain a neutral position.
         """
         # Desired position in the underlying to hedge option delta
