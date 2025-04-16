@@ -10,8 +10,7 @@ from typing import Any
 from datamodel import * 
 
 # Used for Gaussian Distribution Modeling if Needed
-from scipy.stats import norm
-from scipy.optimize import minimize_scalar
+from statistics import NormalDist
 
 
 # CLASS FOR TRACKING MARKET STATUS AND HISTORICAL DATA
@@ -72,6 +71,12 @@ class Status:
 
         # Theta Save 
         self.ema_theta = 0.0
+    
+
+    def strike_price(self) -> float:
+        """ Extracts the Option Strike Price from the Name"""
+        K = float(self.product.split('_')[-1])
+        return K
 
 
     def update(self, state: TradingState) -> None:
@@ -479,40 +484,80 @@ class Status:
         # Compute the Average Weighted by Total Volume
         vwap /= total_amt
         return vwap
+    
+
+    def bid_ask_spread(self) -> int:
+        """
+        Returns the current bid-ask spread (ask - bid) for the product.
+        """
+        return self.best_ask() - self.best_bid()
+    
+
+    def timestep(self) -> int:
+        """
+        Returns the current timestep in seconds by dividing the timestamp by 100.
+        """
+        return self._state.timestamp / 100
         
 
-    def bs_call_price(S, K, T, sigma, r=0):
-        d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma * np.sqrt(T))
-        d2 = d1 - sigma * np.sqrt(T)
-        return S * norm.cdf(d1) - K * np.exp(-r*T) * norm.cdf(d2)
+    def cal_tau(self, day, timestep, T_start=7, T_end=2, total_rounds=5):
+        """
+        Calculate the time to expiration (tau) based on the current round, considering that the expiration time
+        decreases linearly over the rounds.
+        """
+
+        # Calculate linear decrease in expiration time (T) over rounds
+        T = T_start - (day - 1) * (T_start - T_end) / (total_rounds - 1)
+        
+        # Ensure that T doesn't fall below T_end (in case of rounding errors)
+        T = max(T, T_end)
+
+        # Calculate tau based on the number of days left to expiration
+        return T - ((day - 1) * 20000 + timestep) * 2e-7
 
 
-    def implied_volatility(S, K, T, market_price):
-        def objective(sigma):
-            if sigma <= 0: return np.inf
-            return (Status.bs_call_price(S, K, T, sigma) - market_price)**2
-        result = minimize_scalar(objective, bounds=(0.01, 5), method='bounded')
-        return result.x if result.success else None
+    def cal_call(self, S, tau, K, sigma=0.16, r=0):
+        norm = NormalDist()  # create a standard normal distribution
+        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * tau) / (sigma * math.sqrt(tau))
+        delta = norm.cdf(d1)
+        d2 = d1 - sigma * np.sqrt(tau)
+        call_price = S * delta - K * math.exp(-r * tau) * norm.cdf(d2)
+        return call_price, delta
 
 
-    def moneyness(K, S, T):
-        return np.log(K/S) / np.sqrt(T)
+    def cal_imvol(self, market_price, S, tau, K, r=0, tol=1e-6, max_iter=100):
+        sigma = 0.16
+        diff = self.cal_call(S, tau, sigma)[0] - market_price
+
+        iter_count = 0
+        while np.any(np.abs(diff) > tol) and iter_count < max_iter:
+            vega = (self.cal_call(S, tau, sigma+tol)[0] - self.cal_call(S, tau, sigma)[0]) / tol
+            sigma -= diff / vega
+            diff = self.cal_call(S, tau, sigma)[0] - market_price
+            iter_count += 1
+        
+        return sigma
+    
+
+    def total_bidamt(self) -> int:
+        """
+        Calculates the total bid amount for the current product
+        """
+        return sum(self._state.order_depths[self.product].buy_orders.values())
 
 
-    def fit_iv_curve(strikes, spot, T, market_prices):
-        points = []
-        for K, V in zip(strikes, market_prices):
-            iv = Status.implied_volatility(spot, K, T, V)
-            if iv:
-                m = Status.moneyness(K, spot, T)
-                points.append((m, iv))
-        if len(points) >= 3:
-            m_vals, iv_vals = zip(*points)
-            coeffs = np.polyfit(m_vals, iv_vals, deg=2)
-            return coeffs
-        return None
+    def total_askamt(self) -> int:
+        """
+        Property that returns the total ask amount for the current product as a negative value
+        """
+        return -sum(self._state.order_depths[self.product].sell_orders.values())
+    
 
-
+    def calc_hv(self, window=10):
+        prices = self.hist_mid_prc(window)
+        returns = np.diff(np.log(prices))
+        return np.std(returns) * np.sqrt(252)  # annualized
+    
 
 
 # STRATEGY CLASS IMPLEMENTING ARBITRAGE AND MARKET MAKING STRATEGIES FOR TRADING BASED ON FAIR PRICE COMPARISON
@@ -743,135 +788,49 @@ class Strategy:
 
         # Return Results
         return orders
-    
+
+
+    # Volume Trading Arbitrage for Exploitting Options
+    def vol_arb(option: Status, iv, hv=0.16, threshold=0.0012):
+        vol_spread = iv - hv
+        orders = []
+
+        if vol_spread > threshold:
+            sell_amount = option.possible_sell_amt()
+            if sell_amount > 0:
+                orders.append(Order(option.product, option.worst_bid(), -sell_amount))
+                executed_amount = min(sell_amount, option.total_bidamt())
+                option.rt_position_update(option.rt_position() - executed_amount)
+
+        elif vol_spread < -threshold:
+            buy_amount = option.possible_buy_amt()
+            if buy_amount > 0:
+                orders.append(Order(option.product, option.worst_ask(), buy_amount))
+                executed_amount = min(buy_amount, option.total_askamt())
+                option.rt_position_update(option.rt_position() + executed_amount)
+
+        return orders
+
 
     # Delta Hedging Using the Black Scholes Model
-    from functools import lru_cache
-
-    @lru_cache(maxsize=1000)
-    def cached_iv(S, K, T, Vt):
-        return Status.implied_volatility(S, K, T, Vt)
-
-    def delta_hedge(underlying: Status, options: list[Status], current_round: int) -> list:
+    def delta_hedge(underlying: Status, options: Status, delta, rebalance_threshold=30) -> list:
+        target_position = -round(options.rt_position() * delta)
+        current_position = underlying.position()
+        position_diff = target_position - current_position
         orders = []
-        r = 0.0
-        TTE = max(0.01, (8 - current_round) / 365)
-    
-        # 1. Spot price
-        underlying_bid, underlying_ask = underlying.best_bid(), underlying.best_ask()
-        if not all([underlying_bid, underlying_ask]):
-            return []
-        S = (underlying_bid + underlying_ask) / 2
-    
-        strikes, market_prices, m_list, iv_list, option_data = [], [], [], [], []
-    
-        for option in options:
-            K = float(option.product.split('_')[-1])
-            option_bid, option_ask = option.best_bid(), option.best_ask()
-            if not all([option_bid, option_ask]):
-                continue
-    
-            # ✅ Skip options with very wide spreads (30% or more)
-            spread = abs(option_ask - option_bid) / option_ask
-            if spread > 0.30:
-                continue
-    
-            Vt = (option_bid + option_ask) / 2
-            iv = cached_iv(S, K, TTE, Vt)
-            if iv is None:
-                continue
-    
-            m = moneyness(K, S, TTE)
-            strikes.append(K)
-            market_prices.append(Vt)
-            m_list.append(m)
-            iv_list.append(iv)
-            option_data.append((option, K, Vt, iv, m))
-    
-        if len(m_list) < 3:
-            return []
-    
-        # 2. Fit implied volatility curve
-        coeffs = np.polyfit(m_list, iv_list, 2)
-        fitted_vol = lambda m: np.polyval(coeffs, m)
-    
-        # 3. Mispricing + delta hedge
-        for option, K, Vt, iv, m in option_data:
-            fair_iv = fitted_vol(m)
-            mispricing = iv - fair_iv
-    
-            if abs(mispricing) > 0.02:
-                sigma = fair_iv
-                sqrt_T = np.sqrt(TTE)
-                log_term = np.log(S / K)
-                d1 = (log_term + (r + 0.5 * sigma ** 2) * TTE) / (sigma * sqrt_T)
-                delta = norm.cdf(d1)
-    
-                side = -1 if mispricing > 0 else 1  # overvalued → sell, undervalued → buy
-                price = option.best_bid() if side < 0 else option.best_ask()
-                TRADE_SIZE = 1
-    
-                # ✅ Check position limits before trading
-                if (side > 0 and option.possible_buy_amt() >= TRADE_SIZE) or \
-                   (side < 0 and option.possible_sell_amt() >= TRADE_SIZE):
-                    orders.append(Order(option.product, price, side * TRADE_SIZE))
-    
-                    # Simulate new option position for hedge calculation
-                    new_position = option.position() + side * TRADE_SIZE
-                    hedge_qty = round(delta * new_position)
-                    hedge_needed = hedge_qty - underlying.position()
-    
-                    # ✅ Check underlying position limits
-                    if hedge_needed != 0:
-                        hedge_side = 1 if hedge_needed > 0 else -1
-                        hedge_price = underlying.best_ask() if hedge_side > 0 else underlying.best_bid()
-                        hedge_product_limit = underlying.position_limit()
-    
-                        current_pos = underlying.position()
-                        final_pos = current_pos + hedge_needed
-                        if abs(final_pos) <= hedge_product_limit:
-                            orders.append(Order(underlying.product, hedge_price, hedge_needed))
-    
-        return orders
 
-
-        # 2. Fit implied volatility curve
-        coeffs = np.polyfit(m_list, iv_list, 2)
-        fitted_vol = lambda m: np.polyval(coeffs, m)
-
-        # 3. Mispricing + hedging
-        for option, K, Vt, iv, m in option_data:
-            fair_iv = fitted_vol(m)
-            mispricing = iv - fair_iv
-         
-            TRADE_SIZE = 1  # or 2 or more depending on risk
-
-            if abs(mispricing) > 0.02:  # Mispricing threshold
-                        sigma = fair_iv
-                        sqrt_T = np.sqrt(TTE)
-                        log_term = np.log(S / K)
-
-                        # Calculate d1 from Black-Scholes
-                        d1 = (log_term + (r + 0.5 * sigma**2) * TTE) / (sigma * sqrt_T)
-                        delta = norm.cdf(d1)
-
-                        # Entry: Open a position on the mispriced option
-                        side = -1 if mispricing > 0 else 1  # overvalued → sell, undervalued → buy
-                        price = option.best_bid() if side < 0 else option.best_ask()
-                        orders.append(Order(option.product, price, side * 1))  # TRADE_SIZE is 1
-
-                        # Compute the hedge
-                        new_position = option.position() + side * 1  # Simulate new position
-                        hedge_qty = round(delta * new_position)
-                        underlying_pos = underlying.position()
-                        hedge_needed = hedge_qty - underlying_pos
-
-                        if abs(hedge_needed) > 0:
-                            hedge_price = underlying.best_ask() if hedge_needed > 0 else underlying.best_bid()
-                            orders.append(Order(underlying.product, hedge_price, hedge_needed))
+        if abs(position_diff) > rebalance_threshold:
+            if position_diff < 0:
+                sell_amount = min(abs(position_diff), underlying.possible_sell_amt())
+                if sell_amount > 0:
+                    orders.append(Order(underlying.product, underlying.best_bid(), -sell_amount))
+            elif position_diff > 0:
+                buy_amount = min(position_diff, underlying.possible_buy_amt())
+                if buy_amount > 0:
+                    orders.append(Order(underlying.product, underlying.best_ask(), buy_amount))
 
         return orders
-
+    
 
 
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
@@ -890,7 +849,7 @@ class Trade:
 
         # Return the Result
         return orders
-
+ 
 
     # Kelp Strategy (Refined for Price Volatility)
     def kelp(state: Status) -> list[Order]:
@@ -971,16 +930,41 @@ class Trade:
     
     # Volcanic Rock Hedging Strategy (Balck Scholes)
     def rock(volcanic_rock: Status, voucher_9500: Status, voucher_9750: Status, voucher_10000: Status, voucher_10250: Status, voucher_10500: Status) -> list[Order]:
-        # Intalise Orders
-        orders = []
+        result: list[Order] = []
 
-        # Make Options List
-        options_list = [voucher_9500, voucher_9750, voucher_10000, voucher_10250, voucher_10500]
+        vouchers = [
+            voucher_9500,
+            voucher_9750,
+            voucher_10000,
+            voucher_10250,
+            voucher_10500
+        ]
 
-        # Place and Return Orders
-        orders.extend(Strategy.delta_hedge(underlying=volcanic_rock, options=options_list, current_round = 3)) # Update Round?
-        return orders
-    
+        underlying = volcanic_rock
+        underlying_prc = underlying.hist_mid_prc(1)[0]
+        tau = underlying.cal_tau(day=3, timestep=underlying.timestep())
+
+        for option in vouchers:
+            option_prc = option.hist_mid_prc(1)[0]
+
+            strike = option.strike_price()
+            theo, delta = option.cal_call(underlying_prc, tau, K=strike)
+            iv = option.cal_imvol(option_prc, underlying_prc, tau, K=strike)
+
+            # New: Adjust historical volatility (adaptive)
+            hv_window = 15
+            hv = option.calc_hv(window=hv_window)
+
+            # Adjusted: Smaller threshold to be more responsive
+            threshold = 0.0012
+            result.extend(Strategy.vol_arb(option, iv, hv=hv, threshold=threshold))
+
+            # Adjusted: Tighter delta rebalance to avoid drifting exposure
+            rebalance_threshold = 30
+            result.extend(Strategy.delta_hedge(underlying, option, delta, rebalance_threshold=rebalance_threshold))
+
+        return result
+
 
 
 # MAIN ENTRYPOINT FOR THE TRADING AGENT

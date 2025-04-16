@@ -104,10 +104,14 @@ def run_backtest(orderbook_data, trade_data):
                     continue
                 if order.quantity > 0:
                     # Buy
+                    print(f"Price: {price}")
+                    print(f"Volume: {volume}")
                     pnl[product] -= price * volume
                     position[product] += volume
                 else:
                     # Sell
+                    print(f"Price: {price}")
+                    print(f"Volume: {volume}")
                     pnl[product] += price * (-volume)
                     position[product] += volume
 
