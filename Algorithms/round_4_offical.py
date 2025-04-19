@@ -35,6 +35,7 @@ class Status:
         "VOLCANIC_ROCK_VOUCHER_10000": 200,
         "VOLCANIC_ROCK_VOUCHER_10250": 200,
         "VOLCANIC_ROCK_VOUCHER_10500": 200,
+        "MAGNIFICENT_MACARONS": 75,
     }
 
     # Real-time Position for each Product Initialised to 0
@@ -74,18 +75,108 @@ class Status:
 
         # Assign Volatility 
         self.sigma = 0.0
+
+        # Macarons to Sell
+        self.sell_macarons = 0
     
 
     def strike_price(self) -> float:
         """ Extracts the Option Strike Price from the Name"""
         K = float(self.product.split('_')[-1])
         return K
+    
+
+    def stoarageFees(self) -> float:
+        """
+        Returns the storage fees for the product. The storage fees are fixed at 0.1 per unit of the product. 
+        This is typically used in the trade logic to factor in the cost of holding products over a specified period.
+        Returns:
+            float: The storage fee per unit of the product.
+        """
+        return 0.1
+
+
+    def transportFees(self) -> float:
+        """
+        Retrieves the transport fees for the current product from the conversion observations.
+        The transport fees are determined based on the conversion observation for the current product and can vary.
+        Returns:
+            float: The transport fee associated with the product.
+        """
+        return self._state.observations.conversionObservations[self.product].transportFees
+
+
+    def exportTariff(self) -> float:
+        """
+        Retrieves the export tariff for the current product from the conversion observations.
+        The export tariff is specific to the current product and is used to determine costs associated with selling the product.
+        Returns:
+            float: The export tariff for the product.
+        """
+        return self._state.observations.conversionObservations[self.product].exportTariff
+
+
+    def importTariff(self) -> float:
+        """
+        Retrieves the import tariff for the current product from the conversion observations.
+        The import tariff is associated with importing the product, and it is used in the buy logic to calculate the true cost.
+        Returns:
+            float: The import tariff for the product.
+        """
+        return self._state.observations.conversionObservations[self.product].importTariff
+
+
+    def sunlight(self) -> float:
+        """
+        Retrieves the sunlight index for the current product from the conversion observations.
+        The sunlight index can influence the pricing or other factors related to the product, depending on its availability or value.
+        Returns:
+            float: The sunlight index for the product.
+        """
+        return self._state.observations.conversionObservations[self.product].sunlightIndex
+
+
+    def sugar(self) -> float:
+        """
+        Retrieves the sugar price for the current product from the conversion observations.
+        Sugar price is a factor used in determining the cost or value of the product, and it may fluctuate over time.
+        Returns:
+            float: The sugar price for the product.
+        """
+        return self._state.observations.conversionObservations[self.product].sugarPrice
+    
+
+    def bestAsk(self) -> float:
+        """
+        The
+        """
+        return self._state.observations.conversionObservations[self.product].askPrice
+    
+
+    def bestBid(self) -> float:
+        """
+        The
+        """
+        return self._state.observations.conversionObservations[self.product].bidPrice
+    
+    def possible_sell_amt_macarons(self) -> int:
+        return self.sell_macarons
+
+
+    def convObv(self) -> ConversionObservation:
+        """
+        Retrieves the conversion observation for the current product.
+        The conversion observation includes details about various factors affecting the product, including tariffs, fees, and prices.
+        If no conversion observation exists for the current product, it returns None.
+        Returns:
+            ConversionObservation or None: The conversion observation for the product or None if no observation is available.
+        """
+        return self._state.observations.conversionObservations.get(self.product, None)
 
 
     def update(self, state: TradingState) -> None:
         """
         Updates the market status with new data.
-
         Args:
             state (TradingState): The current state containing position and order depths.
         """
@@ -755,7 +846,7 @@ class Strategy:
             list[Order]: List of orders to exploit arbitrage opportunities.
         """
         basket_price = basket.mid()
-        underlying_price = sum(qty * comp.vwap() for comp, qty in components)
+        underlying_price = sum(qty * comp.mid() for comp, qty in components)
         spread = basket_price - underlying_price
         basket.spread_history.append(spread)
 
@@ -899,6 +990,76 @@ class Strategy:
         # Return the list of hedge orders
         return orders  
 
+
+    def trade_macarons(macarons: Status, long_position: bool, order_amount=10, expected_holding_time=1) -> int:
+        """
+        Executes a trade for MAGNIFICENT MACARONS by evaluating the current market conditions, transport fees, tariffs, 
+        and expected storage costs. Based on the calculated profit, the function decides whether to proceed with a buy or sell 
+        order while considering the conversion limits.
+
+        The function factors in conversion requests by checking if the expected profit from a trade can cover storage costs, 
+        and adjusts the buy or sell amount based on the available conversion observation.
+        """
+        # Initialise Conversion Variable to Track the Conversion Request
+        conversion = 0
+
+        # Determine the Possible Buy and Sell amounts Based on Available Position
+        buy_amount = min(order_amount, macarons.possible_buy_amt())  # Maximum amount we can buy
+        sell_amount = min(order_amount, macarons.possible_sell_amt_macarons())  # Maximum amount we can sell
+
+        # Retrieve Transport Fees and Tariffs Associated with the Product
+        transport_fee = macarons.transportFees()
+        import_tariff = macarons.importTariff()
+        export_tariff = macarons.exportTariff()
+
+        # Calculate Expected Storage Cost Per Unit (storage cost is a fixed value times holding time)
+        # storage_cost = macarons.stoarageFees() * expected_holding_time
+
+        # Fetch the ConversionObservation for MAGNIFICENT MACARONS to Evaluate Conversion Feasibility
+        # conversion_obs = macarons.convObv()
+
+        # BUY logic: If we are in a long position (buy) and we have available buy amount
+        if long_position and buy_amount > 0:
+            # Calculate the adjusted purchase price (best ask price plus transport and import tariffs)
+            purchase_price = macarons.bestAsk() + transport_fee + import_tariff
+
+            # Calculate the expected sell price (best bid price minus transport and export tariffs)
+            expected_sell_price = macarons.bestBid() - transport_fee - export_tariff
+
+            # Calculate the expected profit after factoring in storage cost
+            expected_profit = 1
+            # expected_profit = expected_sell_price - purchase_price - storage_cost
+
+            # If the expected profit is positive, proceed with a conversion request, respecting the conversion limit
+            if expected_profit > 0:
+                conversion = min(buy_amount, 10)  # Apply conversion limit (up to 10 items)
+                macarons.sell_macarons = macarons.sell_macarons + conversion
+            else:
+                print(f"[SKIP BUY] Expected profit ({expected_profit:.2f}) not enough to cover storage.")
+  
+        # SELL logic: If we are in a short position (sell) and we have available sell amount
+        elif not long_position and sell_amount > 0:
+            # Calculate the adjusted sell price (best bid minus transport and export tariffs)
+            sell_price = macarons.bestBid() - transport_fee - export_tariff
+
+            # Calculate the expected buyback price (best ask price plus transport and import tariffs)
+            expected_buyback_price = macarons.bestAsk() + transport_fee + import_tariff
+
+            # Calculate the expected profit after factoring in storage cost
+            expected_profit = 1
+            # expected_profit = sell_price - expected_buyback_price
+
+            # If the expected profit is positive, proceed with a conversion request, respecting the conversion limit
+            if expected_profit > 0:
+                conversion = -min(sell_amount, 10)  # Apply conversion limit (up to 10 items) and use negative value for sell
+                macarons.sell_macarons = macarons.sell_macarons + conversion
+            else:
+                print(f"[SKIP SELL] Expected profit ({expected_profit:.2f}) not enough to cover storage.")
+
+        # Return the conversion value, indicating the number of items to convert or trade
+        return conversion
+
+
     
 
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
@@ -978,7 +1139,7 @@ class Trade:
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
 
         # Place and Return Orders
-        #orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.2, threshold=1.5))
+        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.5, threshold=1.5))
         return orders
     
 
@@ -991,7 +1152,7 @@ class Trade:
         components = [(croissants, 4), (jams, 2)]
 
         # Place and Return Orders
-        #orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.2, threshold=1.5))
+        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.5, threshold=1.5))
         return orders
 
     
@@ -1000,11 +1161,11 @@ class Trade:
         result: list[Order] = [] 
 
         # Define historical volatilities (sigmas) for each option voucher
-        voucher_9500.sigma = 0.33
-        voucher_9750.sigma = 0.54
-        voucher_10000.sigma = 1.03
-        voucher_10250.sigma = 1.7
-        voucher_10500.sigma = 1.8
+        voucher_9500.sigma = 0.0036
+        voucher_9750.sigma = 0.006
+        voucher_10000.sigma = 0.025
+        voucher_10250.sigma = 0.03
+        voucher_10500.sigma = 0.0708
 
         # Group all vouchers for iteration
         vouchers = [
@@ -1022,7 +1183,7 @@ class Trade:
         underlying_prc = underlying.hist_mid_prc(1)[0]  
 
         # Time to expiry in years
-        tau = underlying.cal_tau(day=3, timestep=underlying.timestep())  
+        tau = underlying.cal_tau(day=4, timestep=underlying.timestep())  
 
         # Iterate over each option (voucher)
         for option in vouchers:
@@ -1043,15 +1204,39 @@ class Trade:
 
             # Delta Hedging: maintain a market-neutral position
             rebalance_threshold = 30  # Tolerance for position imbalance
-            result.extend(Strategy.delta_hedge(
-                underlying=underlying,
-                options=option,
-                delta=delta,
-                rebalance_threshold=rebalance_threshold
-            ))
+            result.extend(Strategy.delta_hedge(underlying=underlying, options=option, delta=delta, rebalance_threshold=rebalance_threshold))
 
         # Return all generated orders for execution
         return result  
+    
+
+    # French Desserts Method
+    def french(macarons: Status) -> int:
+        # Initalise a Conversions Variable
+        macaron_conversion = 0
+
+        # Critical Sunlight Index (CSI) Threshold
+        CSI = 43
+
+        # Check Current Sunlight Index and Decide Trading Strategy
+        sunlight_index = macarons.sunlight()
+
+        # Conditions to Decide Whether to Increase or Decrease Macaron Production/Trading
+        if sunlight_index < CSI:
+            # If Sunlight is Low, Sugar and Macaron Prices are likely to Increase Due to Panic
+            print("Sunlight below CSI, MACARON prices will increase!")
+
+            # Potential Strategy: Increase Purchases to Capitalise on Price Rise
+            macaron_conversion = Strategy.trade_macarons(macarons, long_position=True, order_amount=10)
+        else:
+            # If Sunlight is above CSI, Supply-Demand Dynamics are more Stable
+            print("Sunlight above CSI, MACARON prices are stable.")
+
+            # Potential Strategy: Maintain Balanced Trading
+            macaron_conversion = Strategy.trade_macarons(macarons, long_position=False, order_amount=10)
+
+        # Update Order List
+        return macaron_conversion
 
 
 
@@ -1078,6 +1263,13 @@ class Trader:
     state_VOLCANIC_ROCK_VOUCHER_10250 = Status('VOLCANIC_ROCK_VOUCHER_10250')
     state_VOLCANIC_ROCK_VOUCHER_10500 = Status('VOLCANIC_ROCK_VOUCHER_10500')
 
+    # Round 4
+    state_MAGNIFICENT_MACARONS = Status('MAGNIFICENT_MACARONS')
+    state_TRANSPORT_FEES = Status('TRANSPORT_FEES')
+    state_IMPORT_TARIFF = Status('IMPORT_TARIFF')
+    state_EXPORT_TARIFF = Status('EXPORT_TARIFF')
+    state_SUNLIGHT_INDEX = Status('SUNLIGHT_INDEX')
+
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
         # Update Internal Class State with Current Round's Info
@@ -1085,6 +1277,7 @@ class Trader:
 
         # Intalise Result Dictionary
         result = {} 
+        conversions = {}
 
         # Use the Defined Strategies for Each Product
         # Round 1
@@ -1096,10 +1289,12 @@ class Trader:
         result["PICNIC_BASKET1"] = Trade.picnic1(self.state_PICNIC1, self.state_CROISSANTS, self.state_DJEMBES, self.state_JAMS)
         result["PICNIC_BASKET2"] = Trade.picnic2(self.state_PICNIC2, self.state_CROISSANTS, self.state_JAMS)
 
-        # # Round 3
+        # Round 3
         result["VOLCANIC_ROCK"] = Trade.rock(self.state_VOLCANIC_ROCK, self.state_VOLCANIC_ROCK_VOUCHER_9500, self.state_VOLCANIC_ROCK_VOUCHER_9750, self.state_VOLCANIC_ROCK_VOUCHER_10000, self.state_VOLCANIC_ROCK_VOUCHER_10250, self.state_VOLCANIC_ROCK_VOUCHER_10500)
 
-        # Return Orders, Conversions (0 = no request), and a Log String
+        # Round 4
+        conversions = Trade.french(self.state_MAGNIFICENT_MACARONS)
+
+        # Return Orders, Conversions, and a Log String
         traderData = "SAMPLE"  # Placeholder string, this will be the data provided to the next execution
-        conversions = 1        # Indicates that a conversion was made (1 = conversion request, 0 = no request)
         return result, conversions, traderData

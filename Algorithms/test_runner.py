@@ -1,7 +1,7 @@
 import csv
 import matplotlib.pyplot as plt
 from datamodel import OrderDepth, TradingState, Observation
-from Algorithms.round_4_offical import Trader
+from round_4_offical import Trader
 
 
 # Load Historical Market States
