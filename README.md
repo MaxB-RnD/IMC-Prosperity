@@ -1,70 +1,76 @@
-# 🏝️ **IMC Prosperity 3 — Round 4 Submission**
+# 🏝️ **IMC Prosperity 3 — Round 5 Submission**
 
-Ahoy again, Prosperous Pirates! 🏴‍☠️  
-Round 4 has docked — and it brings **culinary delights and suitcase strategy** to test your trading wits and psychological instincts.
+Ahoy, Prosperous Pirates! 🏴‍☠️  
+The final wave is here — Round 5 has arrived to test your mettle one last time.
 
-The market grows stranger still, but our resolve? Never stronger. Let’s sink our teeth into this one. 🧁💼
-
----
-
-## 🍰 **Algorithmic Challenge: Magnificent Macarons**
-
-The latest luxury commodity on the island is the delectable `MAGNIFICENT_MACARONS`. Prized for their complexity, these sweet treats fluctuate in value based on a recipe of real-world-like factors: ☀️ **sunlight hours**, 💰 **sugar prices**, 🚢 **shipping costs**, 📦 **storage limitations**, and 🎯 **tariffs**.
-
-But the macarons come with a twist — you can only get them from **Pristine Cuisine**, and each transaction comes at a **cost**:
-
-### ⚙️ Mechanics
-
-- **Buy** from Pristine Cuisine:  
-  - Pay `askPrice` + `TRANSPORT_FEES` + `IMPORT_TARIFF`
-
-- **Sell** to Pristine Cuisine:  
-  - Receive `bidPrice` - `TRANSPORT_FEES` - `EXPORT_TARIFF`
-
-- **Position Limits**:  
-  - `MAGNIFICENT_MACARONS`: **75**
-  - Conversion Limit: **10 per request**
-
-- **Storage Fees**:  
-  - **0.1 Seashells** per timestamp **for every net long unit**  
-  - No storage fee for short positions
-
-> _The key: determine true fair value — account for all frictions and forecast supply-demand._  
-> _Buy low, sell high — but storage and conversion costs could eat your profits like ants at a picnic._
+No new products? Don’t be fooled — this round sharpens the edge with **social dynamics** and **strategic escalation**. 🧠📈  
+It’s not just about market mechanics anymore — it’s about **who** you’re trading with… and **how** you outplay them.
 
 ---
 
-## 💼 **Manual Challenge: Suitcase Showdown**
+## 📊 **Algorithmic Challenge: Know Thy Counterparty**
 
-Welcome to the island’s hottest new game show. 🎉  
-Every inhabitant is offered a shot at treasure by opening up to **three** mysterious **suitcases**. The catch? You split the loot — and your curiosity costs coins.
-
-### 🧳 Game Rules:
-
-- **Open up to 3 suitcases**
-  - First suitcase: **free**
-  - Second/third suitcases: **cost seashells**
-
-- Each suitcase has:
-  - **Treasure Multiplier** (max 100)
-  - **Inhabitants** (up to 15 choosing the same)
-  - **Global Pick %** (how often this suitcase is chosen)
-
-- **Profit Formula:**
-
-```text
-PRIZE = (10,000 × multiplier) / (inhabitants + pickPercentageOfAllSuitcaseOpens)
+The twist? The exchange has started revealing the **identity of your trading counterparty**.
+Meet the new attribute in the `OwnTrade` object:
+```python
+class OwnTrade:
+    def __init__(self, symbol: Symbol, price: int, quantity: int, counter_party: UserId = None) -> None:
+        self.symbol = symbol
+        self.price: int = price
+        self.quantity: int = quantity
+        self.counter_party = counter_party
 ```
 
-Your Profit = PRIZE - Opening Costs
+**This change unlocks powerful possibilities:**
+- Track **opponents’ behavior**.
+- Identify **market manipulators**.
+- Avoid **bad fills** or exploit **predictable actors**.
+- Build **player models** and craft strategies to outsmart them.
 
->_Pick a popular suitcase and your share shrinks. Pick an unpopular one and... maybe it’s empty._🧠
->_Smart pirates strategize — they don’t just follow the crowd._
+> _Every trade tells a story. It’s time to read between the lines… and rewrite your ending._ ✍️
 
 ---
 
-## 🌊 **In Summary**
+## 🌐 **Manual Challenge: The West Archipelago Exchange**
 
-Round 4 sharpens the edge between **fundamental forecasting** and strategic **resource allocation**. Whether you’re mastering macarons or cracking the suitcase code, only the cleverest will thrive.
+Welcome to a **one-day special event** in the **West Archipelago** — hosted by none other than **Benny the Bull**. 🐂💼  
+It’s a **high-stakes playground** where fortunes are made — and lost — at lightning speed.
 
-Let’s cook up profits — and uncover hidden treasures. 🍬💸
+### 📰 Goldberg’s Insider Tips
+
+Benny shares his most **trusted news source** with you: **Goldberg**.  
+Use it wisely — insights from Goldberg can give you a **critical edge**.
+
+### ⚠️ Escalating Trade Costs
+
+The more you trade a **single product**, the **more expensive** it gets.  
+Overtrading will eat your profits — so trade **strategically**, not just frequently.
+
+> _This is the endgame. Everyone’s swinging for the fences. Stay sharp, trade smart, and remember: sometimes the boldest move is the one not made._ ⚔️
+
+---
+
+## 🐜🕷️🪳 **Know Your Enemies (and Friends)**
+
+With counterparty visibility, you’ll see names like:
+
+- **Amir Ant** — master of coordination  
+- **Bashir Beetle** — smooth talker, risk taker  
+- **Sami Spider** — hammocked code wizard  
+- **Cristiano Cockroach** — the comeback king
+
+...and many more. Each trader brings quirks, strategies, and reputations. Use this intel.  
+Track trends. Find patterns. Learn their tells. And beat them at their own game.
+
+---
+
+## 🏁 **Final Words**
+
+This is it. The last stretch. No do-overs. No retries.  
+You’ve come this far — now show the island what you’re made of.
+
+Outwit the spiders, outmaneuver the beetles, outlast the cockroaches.  
+Make every trade count — and bring it home. 💰🏆
+
+Let’s finish strong, pirates.  
+**For glory. For profit. For Prosperity.** 🏝️🔥
