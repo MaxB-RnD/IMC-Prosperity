@@ -77,9 +77,9 @@ class Status:
         # Assign Volatility 
         self.sigma = 0.0
 
-        # Macarons to Sell
-        self.sell_macarons = 0
-    
+        # Keep Track of Time
+        self.tick = 0
+
 
     def strike_price(self) -> float:
         """ Extracts the Option Strike Price from the Name"""
@@ -149,20 +149,19 @@ class Status:
 
     def bestAsk(self) -> float:
         """
-        The
+        Returns the current best ask (lowest sell) price for the specified product
+        from the Macaron observations.
         """
         return self._state.observations.conversionObservations[self.product].askPrice
-    
+
 
     def bestBid(self) -> float:
         """
-        The
+        Returns the current best bid (highest buy) price for the specified product
+        from the Macaron observations.
         """
         return self._state.observations.conversionObservations[self.product].bidPrice
     
-    def possible_sell_amt_macarons(self) -> int:
-        return self.sell_macarons
-
 
     def convObv(self) -> ConversionObservation:
         """
@@ -1025,14 +1024,12 @@ class Strategy:
             expected_sell_price = macarons.mid() - transport_fee - export_tariff
 
             # Calculate the expected profit after factoring in storage cost
-            expected_profit = expected_sell_price - purchase_price - storage_cost
+            expected_profit = 1
+            # expected_profit = expected_sell_price - purchase_price - storage_cost
 
             # If the expected profit is positive, proceed with a conversion request, respecting the conversion limit
             if expected_profit > 0:
                 conversion = min(buy_amount, 10)  # Apply conversion limit (up to 10 items)
-                macarons.sell_macarons += conversion
-            else:
-                print(f"[SKIP BUY] Expected profit ({expected_profit:.2f}) not enough to cover storage.")
   
         # SELL logic: If we are in a short position (sell) and we have available sell amount
         elif not long_position and sell_amount > 0:
@@ -1043,15 +1040,13 @@ class Strategy:
             expected_buyback_price = macarons.mid() + transport_fee + import_tariff
 
             # Calculate the expected profit after factoring in storage cost
-            expected_profit = sell_price - expected_buyback_price
+            expected_profit = 1
+            # expected_profit = sell_price - expected_buyback_price
 
             # If the expected profit is positive, proceed with a conversion request, respecting the conversion limit
             if expected_profit > 0:
-                conversion = -min(sell_amount, macarons.possible_sell_amt_macarons())  # Apply conversion limit (up to 10 items) and use negative value for sell
-                macarons.sell_macarons += conversion
-            else:
-                print(f"[SKIP SELL] Expected profit ({expected_profit:.2f}) not enough to cover storage.")
-
+                conversion = -min(sell_amount, 10)  # Apply conversion limit (up to 10 items) and use negative value for sell
+                
         # Return the conversion value, indicating the number of items to convert or trade
         return conversion
 
@@ -1109,15 +1104,15 @@ class Trade:
         
         # Calculate the Z-score
         z = (current_mid - mean) / std if std > 0 else 0
-                
+
         # Buy signal when price deviates too far below the mean (mean reversion)
-        if z < -0.25 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
+        if z < -0.2 and state.possible_buy_amt() > 0:  # Buy if the Z-score is negative and price is below the mean
             buy_price = state.best_bid()  # Correct price to buy at
             order_amount = min(20, state.possible_buy_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", buy_price, order_amount))  # Positive = buy
         
         # Sell signal when price deviates too far above the mean (mean reversion)
-        if z > 0.25 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
+        if z > 0.2 and state.possible_sell_amt() > 0:  # Sell if the Z-score is positive and price is above the mean
             sell_price = state.best_ask()  # Correct price to sell at
             order_amount = min(20, state.possible_sell_amt())  # Don't exceed available amount
             orders.append(Order("SQUID_INK", sell_price, -order_amount))  # Negative = sell
@@ -1134,7 +1129,7 @@ class Trade:
         components = [(croissants, 6), (jams, 3), (djembes, 1)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.5, threshold=1.5))
+        orders.extend(Strategy.basket_arb(basket=picnic1, components=components, alpha=0.8, threshold=1.5))
         return orders
     
 
@@ -1147,20 +1142,21 @@ class Trade:
         components = [(croissants, 4), (jams, 2)]
 
         # Place and Return Orders
-        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.5, threshold=1.5))
+        orders.extend(Strategy.basket_arb(basket=picnic2, components=components, alpha=0.3, threshold=1.5))
         return orders
 
     
+    # Volcanic Rock Trading Algorithm
     def rock(volcanic_rock: Status, voucher_9500: Status, voucher_9750: Status, voucher_10000: Status, voucher_10250: Status, voucher_10500: Status) -> list[Order]:
         # Stores all generated orders from the strategy
         result: list[Order] = [] 
 
         # Define historical volatilities (sigmas) for each option voucher
-        voucher_9500.sigma = 0.0036
-        voucher_9750.sigma = 0.006
-        voucher_10000.sigma = 0.025
-        voucher_10250.sigma = 0.03
-        voucher_10500.sigma = 0.0708
+        voucher_9500.sigma = 0.0045
+        voucher_9750.sigma = 0.01
+        voucher_10000.sigma = 0.05
+        voucher_10250.sigma = 0.055
+        voucher_10500.sigma = 0.187
 
         # Group all vouchers for iteration
         vouchers = [
@@ -1207,31 +1203,26 @@ class Trade:
 
     # French Desserts Method
     def french(macarons: Status) -> int:
-        # Initalise a Conversions Variable
-        macaron_conversion = 0
+        # Settings
+        CSI = 44
 
-        # Critical Sunlight Index (CSI) Threshold
-        CSI = 43
+        # Read current values
+        current_sunlight = macarons.sunlight()
+        current_sugar = macarons.sugar()
+        current_position = macarons.position()
 
-        # Check Current Sunlight Index and Decide Trading Strategy
-        sunlight_index = 4
+        # If both panic conditions met and we don’t already hold many, buy
+        if current_sunlight < CSI:
+            order_amount = Strategy.trade_macarons(macarons, long_position=True)
+            return order_amount  # long
 
-        # Conditions to Decide Whether to Increase or Decrease Macaron Production/Trading
-        if sunlight_index < CSI:
-            # If Sunlight is Low, Sugar and Macaron Prices are likely to Increase Due to Panic
-            print("Sunlight below CSI, MACARON prices will increase!")
+        # If sunlight is high again, and we hold a position, start offloading
+        elif current_sunlight > CSI:
+            order_amount = Strategy.trade_macarons(macarons, long_position=False)
+            return order_amount  # sell
 
-            # Potential Strategy: Increase Purchases to Capitalise on Price Rise
-            macaron_conversion = Strategy.trade_macarons(macarons, long_position=True, order_amount=10)
-        else:
-            # If Sunlight is above CSI, Supply-Demand Dynamics are more Stable
-            print("Sunlight above CSI, MACARON prices are stable.")
-
-            # Potential Strategy: Maintain Balanced Trading
-            macaron_conversion = Strategy.trade_macarons(macarons, long_position=False, order_amount=10)
-
-        # Update Order List
-        return macaron_conversion
+        # Otherwise, do nothing
+        return 0
 
 
 
@@ -1260,10 +1251,6 @@ class Trader:
 
     # Round 4
     state_MAGNIFICENT_MACARONS = Status('MAGNIFICENT_MACARONS')
-    state_TRANSPORT_FEES = Status('TRANSPORT_FEES')
-    state_IMPORT_TARIFF = Status('IMPORT_TARIFF')
-    state_EXPORT_TARIFF = Status('EXPORT_TARIFF')
-    state_SUNLIGHT_INDEX = Status('SUNLIGHT_INDEX')
 
     # The Main Run Function
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:

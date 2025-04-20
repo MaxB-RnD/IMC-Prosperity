@@ -1,8 +1,7 @@
 import csv
 import matplotlib.pyplot as plt
-from datamodel import OrderDepth, TradingState, Observation
+from datamodel import OrderDepth, TradingState, Observation, ConversionObservation
 from round_5_offical import Trader
-
 
 # Load Historical Market States
 def load_order_book_data(file_path):
@@ -16,15 +15,13 @@ def load_order_book_data(file_path):
                 data_by_timestamp[ts] = {}
             if product not in data_by_timestamp[ts]:
                 data_by_timestamp[ts][product] = OrderDepth()
-
             order_depth = data_by_timestamp[ts][product]
-            # Parse bid orders
+
             for i in range(1, 4):
                 price = row.get(f'bid_price_{i}')
                 vol = row.get(f'bid_volume_{i}')
                 if price and vol:
                     order_depth.buy_orders[int(price)] = int(vol)
-            # Parse ask orders
             for i in range(1, 4):
                 price = row.get(f'ask_price_{i}')
                 vol = row.get(f'ask_volume_{i}')
@@ -32,8 +29,6 @@ def load_order_book_data(file_path):
                     order_depth.sell_orders[int(price)] = int(vol)
         return data_by_timestamp
 
-
-# Load executed trades (historical prices)
 def load_trade_data(file_path):
     with open(file_path, newline='') as f:
         reader = csv.DictReader(f, delimiter=';')
@@ -49,33 +44,40 @@ def load_trade_data(file_path):
             trades_by_ts[ts].append((symbol, price, qty))
         return trades_by_ts
 
+# Load sunlight index, sugar price, tariffs, etc.
+def load_observation_data(file_path):
+    with open(file_path, newline='') as f:
+        reader = csv.DictReader(f, delimiter=',')
+        obs_by_ts = {}
+        for row in reader:
+            ts = int(row['timestamp'])
 
-# Run the backtest and track PnL at each timestamp
-def run_backtest(orderbook_data, trade_data):
+            obs_by_ts[ts] = {
+                "MAGNIFICENT_MACARONS": ConversionObservation(
+                    bidPrice=float(row["bidPrice"]),
+                    askPrice=float(row["askPrice"]),
+                    transportFees=float(row["transportFees"]),
+                    exportTariff=float(row["exportTariff"]),
+                    importTariff=float(row["importTariff"]),
+                    sugarPrice=float(row["sugarPrice"]),
+                    sunlightIndex=float(row["sunlightIndex"])
+                )
+            }
+        return obs_by_ts
+
+def run_backtest(orderbook_data, trade_data, observation_data):
     trader = Trader()
-    
-    position = {
-    "RAINFOREST_RESIN": 0, "KELP": 0, "SQUID_INK": 0,
-    "PICNIC_BASKET1": 0, "PICNIC_BASKET2": 0,
-    "VOLCANIC_ROCK": 0,
-    "VOLCANIC_ROCK_VOUCHER_9500": 0,
-    "VOLCANIC_ROCK_VOUCHER_9750": 0,
-    "VOLCANIC_ROCK_VOUCHER_10000": 0,
-    "VOLCANIC_ROCK_VOUCHER_10250": 0,
-    "VOLCANIC_ROCK_VOUCHER_10500": 0,
-    }
 
-    pnl = {
-        "RAINFOREST_RESIN": 0.0, "KELP": 0.0, "SQUID_INK": 0.0,
-        "PICNIC_BASKET1": 0.0, "PICNIC_BASKET2": 0.0,
-        "VOLCANIC_ROCK": 0.0,
-        "VOLCANIC_ROCK_VOUCHER_9500": 0.0,
-        "VOLCANIC_ROCK_VOUCHER_9750": 0.0,
-        "VOLCANIC_ROCK_VOUCHER_10000": 0.0,
-        "VOLCANIC_ROCK_VOUCHER_10250": 0.0,
-        "VOLCANIC_ROCK_VOUCHER_10500": 0.0,
-    }
+    position = {p: 0 for p in [
+        "RAINFOREST_RESIN", "KELP", "SQUID_INK",
+        "PICNIC_BASKET1", "PICNIC_BASKET2",
+        "VOLCANIC_ROCK", "MAGNIFICENT_MACARONS",
+        "VOLCANIC_ROCK_VOUCHER_9500", "VOLCANIC_ROCK_VOUCHER_9750",
+        "VOLCANIC_ROCK_VOUCHER_10000", "VOLCANIC_ROCK_VOUCHER_10250",
+        "VOLCANIC_ROCK_VOUCHER_10500"
+    ]}
 
+    pnl = {k: 0.0 for k in position}
     pnl_over_time = []
     timestamps = []
 
@@ -88,71 +90,67 @@ def run_backtest(orderbook_data, trade_data):
             own_trades={},
             market_trades={},
             position=position,
-            observations=Observation({}, {})
+            observations=Observation({}, observation_data.get(ts, {}))  # second arg = conversionObservations
         )
 
-        # Run the Algorithm
         orders, conversions, _ = trader.run(state)
 
-        # Simulate execution: assume orders are filled at the top of book
         for product, order_list in orders.items():
             for order in order_list:
                 volume = order.quantity
                 price = order.price
-                if price is None or price == float("inf") or price == float("-inf"):
-                    print(f"[Debug] Skipping invalid price order at ts {ts}: {price}")
+                if price is None or price in [float("inf"), float("-inf")]:
                     continue
                 if order.quantity > 0:
-                    # Buy
                     pnl[product] -= price * volume
                     position[product] += volume
                 else:
-                    # Sell
                     pnl[product] += price * (-volume)
                     position[product] += volume
 
-        # Track total PnL across all products
         total_pnl = sum(pnl.values())
         pnl_over_time.append(total_pnl)
         timestamps.append(ts)
 
-    return pnl, position, timestamps, pnl_over_time
+    return pnl, position, timestamps, pnl_over_time, conversions
 
 
-# Load and backtest each day's data
 def run_test():
-    orderbook_data0 = load_order_book_data("Performance Data/Historic Data/prices_round_5_day_2.csv")
-    trade_data0 = load_trade_data("Performance Data/Historic Data/trades_round_5_day_2.csv")
-    pnl0, final_position0, ts0, pnl_over_time0 = run_backtest(orderbook_data0, trade_data0)
+    # Load data for day 2
+    orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_5_day_2.csv")
+    trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_5_day_2.csv")
+    obs_data2 = load_observation_data("Performance Data/Historic Data/observations_round_5_day_2.csv")
+    pnl2, final_position2, ts2, pnl_over_time2, conversions2 = run_backtest(orderbook_data2, trade_data2, obs_data2)
 
-    orderbook_data1 = load_order_book_data("Performance Data/Historic Data/prices_round_5_day_3.csv")
-    trade_data1 = load_trade_data("Performance Data/Historic Data/trades_round_5_day_3.csv")
-    pnl1, final_position1, ts1, pnl_over_time1 = run_backtest(orderbook_data1, trade_data1)
+    # Load data for day 3
+    orderbook_data3 = load_order_book_data("Performance Data/Historic Data/prices_round_5_day_3.csv")
+    trade_data3 = load_trade_data("Performance Data/Historic Data/trades_round_5_day_3.csv")
+    obs_data3 = load_observation_data("Performance Data/Historic Data/observations_round_5_day_3.csv")
+    pnl3, final_position3, ts3, pnl_over_time3, conversions3 = run_backtest(orderbook_data3, trade_data3, obs_data3)
 
-    orderbook_data2 = load_order_book_data("Performance Data/Historic Data/prices_round_5_day_4.csv")
-    trade_data2 = load_trade_data("Performance Data/Historic Data/trades_round_5_day_4.csv")
-    pnl2, final_position2, ts2, pnl_over_time2 = run_backtest(orderbook_data2, trade_data2)
+    # Load data for day 4
+    orderbook_data4 = load_order_book_data("Performance Data/Historic Data/prices_round_5_day_4.csv")
+    trade_data4 = load_trade_data("Performance Data/Historic Data/trades_round_5_day_4.csv")
+    obs_data4 = load_observation_data("Performance Data/Historic Data/observations_round_5_day_4.csv")
+    pnl4, final_position4, ts4, pnl_over_time4, conversions4 = run_backtest(orderbook_data4, trade_data4, obs_data4)
 
-    # Add totals for PnL
-    pnl_total = {}
-    for product in pnl0:
-        pnl_total[product] = pnl0[product] + pnl1[product] + pnl2[product]
+    # Merging results: Combine PnL, final positions, and time series
+    combined_pnl = {**pnl2, **pnl3, **pnl4}
+    combined_final_position = {**final_position2, **final_position3, **final_position4}
+    combined_ts = ts2 + ts3 + ts4
+    combined_pnl_over_time = pnl_over_time2 + pnl_over_time3 + pnl_over_time4
+    combined_conversions = conversions2 + conversions3 + conversions4  # Combine conversions from all days
 
-    # Add totals for Final Positions
-    final_position_total = {}
-    for product in final_position0:
-        final_position_total[product] = final_position0[product] + final_position1[product] + final_position2[product]
-
-    # Print Results
+    # Print PnL Summary
     print("PnL Summary:")
-    for product in pnl_total:
-        print(f"{product}: {pnl_total[product]:.2f} seashells")
+    for product, value in combined_pnl.items():
+        if product == "MAGNIFICENT_MACARONS":
+            print(f"Conversions Made: {combined_conversions}")
+        else:
+            print(f"{product}: {value:.2f} seashells")
 
+    # Print Final Positions
     print("\nFinal Positions:")
-    print(final_position_total)
+    print(combined_final_position)
 
-    # Combine PnL over time
-    combined_ts = ts0 + ts1 + ts2
-    combined_pnl = pnl_over_time0 + pnl_over_time1 + pnl_over_time2
-
-    return combined_ts, combined_pnl
+    return combined_ts, combined_pnl_over_time
