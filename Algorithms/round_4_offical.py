@@ -86,7 +86,7 @@ class Status:
         return K
     
 
-    def stoarageFees(self) -> float:
+    def storageFees(self) -> float:
         """
         Returns the storage fees for the product. The storage fees are fixed at 0.1 per unit of the product. 
         This is typically used in the trade logic to factor in the cost of holding products over a specified period.
@@ -991,7 +991,7 @@ class Strategy:
         return orders  
 
 
-    def trade_macarons(macarons: Status, long_position: bool, order_amount=10, expected_holding_time=1) -> int:
+    def trade_macarons(macarons: Status, long_position: bool, order_amount=10, expected_holding_time=6) -> int:
         """
         Executes a trade for MAGNIFICENT MACARONS by evaluating the current market conditions, transport fees, tariffs, 
         and expected storage costs. Based on the calculated profit, the function decides whether to proceed with a buy or sell 
@@ -1005,7 +1005,7 @@ class Strategy:
 
         # Determine the Possible Buy and Sell amounts Based on Available Position
         buy_amount = min(order_amount, macarons.possible_buy_amt())  # Maximum amount we can buy
-        sell_amount = min(order_amount, macarons.possible_sell_amt_macarons())  # Maximum amount we can sell
+        sell_amount = min(order_amount, macarons.possible_sell_amt())  # Maximum amount we can sell
 
         # Retrieve Transport Fees and Tariffs Associated with the Product
         transport_fee = macarons.transportFees()
@@ -1013,10 +1013,7 @@ class Strategy:
         export_tariff = macarons.exportTariff()
 
         # Calculate Expected Storage Cost Per Unit (storage cost is a fixed value times holding time)
-        # storage_cost = macarons.stoarageFees() * expected_holding_time
-
-        # Fetch the ConversionObservation for MAGNIFICENT MACARONS to Evaluate Conversion Feasibility
-        # conversion_obs = macarons.convObv()
+        storage_cost = macarons.storageFees() * expected_holding_time
 
         # BUY logic: If we are in a long position (buy) and we have available buy amount
         if long_position and buy_amount > 0:
@@ -1024,16 +1021,15 @@ class Strategy:
             purchase_price = macarons.bestAsk() + transport_fee + import_tariff
 
             # Calculate the expected sell price (best bid price minus transport and export tariffs)
-            expected_sell_price = macarons.bestBid() - transport_fee - export_tariff
+            expected_sell_price = macarons.mid() - transport_fee - export_tariff
 
             # Calculate the expected profit after factoring in storage cost
-            expected_profit = 1
-            # expected_profit = expected_sell_price - purchase_price - storage_cost
+            expected_profit = expected_sell_price - purchase_price - storage_cost
 
             # If the expected profit is positive, proceed with a conversion request, respecting the conversion limit
             if expected_profit > 0:
                 conversion = min(buy_amount, 10)  # Apply conversion limit (up to 10 items)
-                macarons.sell_macarons = macarons.sell_macarons + conversion
+                macarons.sell_macarons += conversion
             else:
                 print(f"[SKIP BUY] Expected profit ({expected_profit:.2f}) not enough to cover storage.")
   
@@ -1043,16 +1039,15 @@ class Strategy:
             sell_price = macarons.bestBid() - transport_fee - export_tariff
 
             # Calculate the expected buyback price (best ask price plus transport and import tariffs)
-            expected_buyback_price = macarons.bestAsk() + transport_fee + import_tariff
+            expected_buyback_price = macarons.mid() + transport_fee + import_tariff
 
             # Calculate the expected profit after factoring in storage cost
-            expected_profit = 1
-            # expected_profit = sell_price - expected_buyback_price
+            expected_profit = sell_price - expected_buyback_price
 
             # If the expected profit is positive, proceed with a conversion request, respecting the conversion limit
             if expected_profit > 0:
-                conversion = -min(sell_amount, 10)  # Apply conversion limit (up to 10 items) and use negative value for sell
-                macarons.sell_macarons = macarons.sell_macarons + conversion
+                conversion = -min(sell_amount, macarons.possible_sell_amt_macarons())  # Apply conversion limit (up to 10 items) and use negative value for sell
+                macarons.sell_macarons += conversion
             else:
                 print(f"[SKIP SELL] Expected profit ({expected_profit:.2f}) not enough to cover storage.")
 
@@ -1061,7 +1056,6 @@ class Strategy:
 
 
     
-
 # CLASS CONTAINING STRATEGIES FOR EACH PRODUCT
 class Trade:
     # Rainforest Resin Method
@@ -1219,7 +1213,7 @@ class Trade:
         CSI = 43
 
         # Check Current Sunlight Index and Decide Trading Strategy
-        sunlight_index = macarons.sunlight()
+        sunlight_index = 4
 
         # Conditions to Decide Whether to Increase or Decrease Macaron Production/Trading
         if sunlight_index < CSI:
