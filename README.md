@@ -55,5 +55,11 @@ We applied a range of **machine learning techniques** to optimise decision-makin
 
 ## 🚀 Our Results
 
-While the challenge itself had its ups and downs, our models demonstrated an ability to adapt quickly to changing market conditions. We saw success in some strategies, including [briefly mention any top performance if applicable] — and gained deep insights into **advanced trading strategies** and **algorithm optimisation**.
+While the challenge itself had its ups and downs, our models demonstrated an ability to adapt quickly to changing market conditions. We saw success in some strategies — and gained deep insights into **advanced trading strategies** and **algorithm optimisation**.
+
+🏁 In the final round, we surged ahead by **100 positions**, finishing **191st overall** out of **12,620 teams worldwide**. Within Australia, we proudly ranked **13th**, placing us in the **top 1.5% globally** — an achievement that reflects our team's persistence, adaptability, and collaborative problem-solving.
+
+![Island Screenshot](.images//island.png)
+![Leaderboard Screenshot](.images//leaderboard.png)
+![National Leaderboard](.images//leaderboard_Austalia.png)
 
