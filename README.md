@@ -59,7 +59,6 @@ While the challenge itself had its ups and downs, our models demonstrated an abi
 
 🏁 In the final round, we surged ahead by **100 positions**, finishing **191st overall** out of **12,620 teams worldwide**. Within Australia, we proudly ranked **13th**, placing us in the **top 1.5% globally** — an achievement that reflects our team's persistence, adaptability, and collaborative problem-solving.
 
-![Island Screenshot](.images//island.png)
-![Leaderboard Screenshot](.images//leaderboard.png)
-![National Leaderboard](.images//leaderboard_Austalia.png)
+![Island Screenshot](Images//island.png)
+![Leaderboard Screenshot](Images//leaderboard.png)
 
